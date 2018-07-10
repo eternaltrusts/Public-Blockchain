@@ -1,0 +1,55 @@
+{
+  "types": [
+    {
+      "new_type_name": "account_name",
+      "type": "name"
+    }
+  ],
+  "structs": [
+    {
+      "name": "no_id_transaction",
+      "base": "",
+      "fields": [
+        {
+          "name": "account",
+          "type": "account_name"
+        },
+        {
+          "name": "transaction_id",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "transaction",
+      "base": "no_id_transaction",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uint64"
+        }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "name": "createtrx",
+      "type": "no_id_transaction",
+      "ricardian_contract": ""
+    }
+  ],
+  "tables": [
+    {
+      "name": "transactions",
+      "type": "transaction",
+      "index_type": "i64",
+      "key_names": [
+        "id"
+      ],
+      "key_types": [
+        "uint64"
+      ]
+    }
+  ],
+  "clauses": []
+}
