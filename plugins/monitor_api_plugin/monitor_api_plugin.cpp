@@ -63,7 +63,7 @@ void monitor_api_plugin::plugin_startup() {
     ilog("starting monitor_api_plugin");
 
     app().get_plugin<http_plugin>().add_api({
-         CALL(monitor, my, call, INVOKE_V_V(my, call), 200)
+         CALL(monitor, my, call, INVOKE_V_V(my, call_test), 200)
     });
 }
 
