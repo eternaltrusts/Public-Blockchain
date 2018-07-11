@@ -28,7 +28,7 @@ public:
     void plugin_shutdown();
 
 private:
-    std::unique_ptr<class monitor_api_plugin_impl> my;
+    std::unique_ptr<class monitor_api_plugin_impl> _monitor_api_plugin_impl;
 };
 
 }

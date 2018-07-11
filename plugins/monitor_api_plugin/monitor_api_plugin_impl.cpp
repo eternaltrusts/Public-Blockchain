@@ -17,11 +17,17 @@ eosio::monitor_api_plugin_impl::monitor_api_plugin_impl()
     _context = eosio::client::http::create_http_context();
 }
 
+// TODO test method
 void eosio::monitor_api_plugin_impl::call_test() {
     ilog(__FUNCTION__);
-    abi_serializer::set_max_serialization_time(fc::seconds(1));
 
-//    get_info();
+    is_valid_url("http://localhost:8888");
+    is_valid_url("http://localhost:8888/");
+    is_valid_url("localhost:8888");
+    is_valid_url("http://localhost:8888/");
+    return;
+
+    abi_serializer::set_max_serialization_time(fc::seconds(1));
 
     string data = "{\"account\": \"currency\", \"transaction_id\": \"test_trx\"}";
     fc::variant action_args_var;
@@ -38,7 +44,7 @@ void eosio::monitor_api_plugin_impl::call_test() {
     auto result = call(json_to_bin_func, arg);
 
     auto accountPermissions = get_account_permissions(vector<string>{"currency"});
-    send_actions({chain::action{accountPermissions, "contr", "createtrx", result.get_object()["binargs"].as<bytes>()}});
+    send_actions({chain::action{accountPermissions, "contr", "createtrx test", result.get_object()["binargs"].as<bytes>()}});
 }
 
 void eosio::monitor_api_plugin_impl::push_action() {
@@ -51,6 +57,14 @@ void eosio::monitor_api_plugin_impl::push_transaction() {
 
 void eosio::monitor_api_plugin_impl::push_transactions() {
 
+}
+
+void eosio::monitor_api_plugin_impl::set_list_nodes(const vector<fc::string> &nodes) {
+    _nodes = nodes;
+}
+
+void eosio::monitor_api_plugin_impl::set_list_wallets(const vector<string> &wallets) {
+    _wallets = wallets;
 }
 
 template<typename T>
@@ -291,4 +305,13 @@ eosio::chain::authority eosio::monitor_api_plugin_impl::parse_json_authority_or_
        EOS_ASSERT( eosio::chain::validate(result), authority_type_exception, "Authority failed validation! ensure that keys, accounts, and waits are sorted and that the threshold is valid and satisfiable!");
        return result;
     }
- }
+}
+
+fc::string eosio::monitor_api_plugin_impl::is_valid_url(const fc::string &url) {
+//    regex r("/^(http?:\/\/)?([\w\.]+)\.([a-z]{2,6}\.?)(\/[\w\.]*)*\/?$/");
+//    if (!regex_search(url, r)) {
+//        auto valid_url = "http://" + url +"/";
+//        return valid_url;
+//    }
+    return url;
+}

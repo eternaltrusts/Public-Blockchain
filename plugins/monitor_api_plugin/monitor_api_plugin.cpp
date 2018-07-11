@@ -41,21 +41,26 @@ namespace eosio {
 
 
 monitor_api_plugin::monitor_api_plugin()
-    : my(new monitor_api_plugin_impl())
+    : _monitor_api_plugin_impl(new monitor_api_plugin_impl())
 {}
 
 
 void monitor_api_plugin::set_program_options(options_description&, options_description& cfg) {
-//   cfg.add_options()
-//         ("option-name", bpo::value<string>()->default_value("default value"),
-//          "Option Description")
-//         ;
+   cfg.add_options()
+           ("addr_node", bpo::value< vector<string> >()->composing(), "Node(s) to enable, may be specified multiple times")
+           ("addr_wallet", bpo::value< vector<string> >()->composing(), "Wallet to enable")
+           ;
 }
 
 void monitor_api_plugin::plugin_initialize(const variables_map& options) {
-   my.reset(new monitor_api_plugin_impl);
-   if(options.count("option-name")) {
-      // Handle the option
+   _monitor_api_plugin_impl.reset(new monitor_api_plugin_impl);
+   if(options.count("addr_node")) {
+       auto nodes = options.at("addr_node").as<std::vector<std::string>>();
+       _monitor_api_plugin_impl->set_list_nodes(nodes);
+   }
+   if(options.count("addr_wallet")) {
+       auto wallets = options.at("addr_wallet").as<std::vector<std::string>>();
+       _monitor_api_plugin_impl->set_list_wallets(wallets);
    }
 }
 
@@ -63,7 +68,7 @@ void monitor_api_plugin::plugin_startup() {
     ilog("starting monitor_api_plugin");
 
     app().get_plugin<http_plugin>().add_api({
-         CALL(monitor, my, call, INVOKE_V_V(my, call_test), 200)
+         CALL(monitor, _monitor_api_plugin_impl, call, INVOKE_V_V(_monitor_api_plugin_impl, call_test), 200)
     });
 }
 

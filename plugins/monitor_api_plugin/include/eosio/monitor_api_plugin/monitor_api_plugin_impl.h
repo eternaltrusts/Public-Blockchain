@@ -57,6 +57,9 @@ public:
     void push_transaction();
     void push_transactions();
 
+    void set_list_nodes(const vector<string> &nodes);
+    void set_list_wallets(const vector<string> &wallets);
+
 private:
     template<typename T>
     fc::variant call(const std::string& url, const std::string& path, const T& v);
@@ -88,6 +91,7 @@ private:
     authority parse_json_authority(const std::string& authorityJsonOrFile);
     authority parse_json_authority_or_key(const std::string& authorityJsonOrFile);
 
+    string is_valid_url(const string &url);
 
 private:
     eosio::client::http::http_context _context;
@@ -95,7 +99,10 @@ private:
     string url = "http://localhost:8888/";
     string wallet_url = "http://localhost:8900/";
     bool no_verify = false;
+
     vector<string> headers;
+    vector<string> _nodes;
+    vector<string> _wallets;
 
     string _tx_ref_block_num_or_id;
     bool   _tx_force_unique;
