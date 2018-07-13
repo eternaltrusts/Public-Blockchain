@@ -1,13 +1,28 @@
 #include "eosio/monitor_api_plugin/monitor_api_plugin_impl.h"
 
+#include <regex>
+
+#include <boost/range/algorithm/find_if.hpp>
+#include <boost/range/algorithm/sort.hpp>
+#include <boost/range/algorithm/copy.hpp>
+#include <boost/range/adaptor/transformed.hpp>
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/classification.hpp>
+
+#include <eosio/wallet_plugin/wallet_plugin.hpp>
+#include <eosio/wallet_plugin/wallet_manager.hpp>
+
+
+
 using namespace std;
 using namespace eosio::client::http;
 
-//const static std::string default_url = "http://localhost:8888/";
 const static std::string default_wallet_url = "http://localhost:8900/";
 
 eosio::monitor_api_plugin_impl::monitor_api_plugin_impl()
-    : _print_request(false)
+    : _is_monitor_app(false)
+    , _print_request(false)
     , _print_response(false)
     , _tx_dont_broadcast(false)
     , _tx_force_unique(false)
@@ -28,7 +43,6 @@ eosio::structures::result eosio::monitor_api_plugin_impl::push_action(const eosi
 
     std::map<std::string, eosio::structures::result> map_result;
     for (const string addr_node : _nodes) {
-//        _url = is_valid_url(addr_node);
 
         if (!data.is_valid())
             return eosio::structures::result(false, "field is empty transaction_id");
@@ -63,6 +77,10 @@ eosio::structures::result eosio::monitor_api_plugin_impl::push_action(const eosi
     if (passed >= failed_to)
         return eosio::structures::result(true);
     return eosio::structures::result(false, "Requests have not passed");
+}
+
+void eosio::monitor_api_plugin_impl::monitor_app() {
+    _is_monitor_app = true;
 }
 
 void eosio::monitor_api_plugin_impl::set_list_nodes(const vector<fc::string> &nodes) {
@@ -103,7 +121,7 @@ template<typename T>
 fc::variant eosio::monitor_api_plugin_impl::call(const std::string &url, const std::string &path, const T &v) {
     try {
        auto cp = new eosio::client::http::connection_param(_context, parse_url(url) + path,
-               _no_verify ? false : true, headers);
+               _no_verify ? false : true, _headers);
 
        return eosio::client::http::do_http_call( *cp, fc::variant(v), _print_request, _print_response );
     }
@@ -141,19 +159,27 @@ eosio::chain::action eosio::monitor_api_plugin_impl::generate_nonce_action() {
 }
 
 fc::variant eosio::monitor_api_plugin_impl::determine_required_keys(const string &url, const string &wallet_url, const eosio::chain::signed_transaction &trx) {
-    const auto& public_keys = call(wallet_url, wallet_public_keys);
-    auto get_arg = fc::mutable_variant_object
-            ("transaction", (transaction)trx)
-            ("available_keys", public_keys);
-    const auto& required_keys = call(url, get_required_keys, get_arg);
-    return required_keys["required_keys"];
+    if (_is_monitor_app) {
+        const auto& public_keys = call(wallet_url, wallet_public_keys);
+        auto get_arg = fc::mutable_variant_object
+                ("transaction", (transaction)trx)
+                ("available_keys", public_keys);
+        const auto& required_keys = call(url, get_required_keys, get_arg);
+        return required_keys["required_keys"];
+    } else {
+        return fc::variant();
+    }
 }
 
 void eosio::monitor_api_plugin_impl::sign_transaction(const string &wallet_url, eosio::chain::signed_transaction &trx,
                                                       fc::variant &required_keys, const eosio::chain::chain_id_type &chain_id) {
-    fc::variants sign_args = {fc::variant(trx), required_keys, fc::variant(chain_id)};
-    const auto& signed_trx = call(wallet_url, wallet_sign_trx, sign_args);
-    trx = signed_trx.as<signed_transaction>();
+    if (_is_monitor_app) {
+        fc::variants sign_args = {fc::variant(trx), required_keys, fc::variant(chain_id)};
+        const auto& signed_trx = call(wallet_url, wallet_sign_trx, sign_args);
+        trx = signed_trx.as<signed_transaction>();
+    } else {
+//        auto& wallet_mgr = app().get_plugin<wallet_plugin>().get_wallet_manager();
+    }
 }
 
 fc::variant eosio::monitor_api_plugin_impl::push_transaction(const string &url, eosio::chain::signed_transaction &trx,

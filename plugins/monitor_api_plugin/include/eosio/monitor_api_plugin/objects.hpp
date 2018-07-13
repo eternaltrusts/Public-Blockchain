@@ -1,5 +1,5 @@
 #pragma once
-#include <eosio/chain_plugin/chain_plugin.hpp>
+#include <eosio/chain/types.hpp>
 
 namespace eosio {
 namespace structures {
@@ -16,7 +16,7 @@ namespace structures {
     };
 
     struct eos_trx {
-        account_name account;
+        eosio::chain::account_name account;
         std::string transaction_id;
 
         bool is_valid()const {

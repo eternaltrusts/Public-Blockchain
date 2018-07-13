@@ -79,6 +79,11 @@ void monitor_api_plugin::plugin_startup() {
 
 void monitor_api_plugin::plugin_shutdown() {
 }
+
+void monitor_api_plugin::monitor_app() {
+    _monitor_api_plugin_impl->monitor_app();
+}
+
 }
 
 #undef INVOKE_R_R_R

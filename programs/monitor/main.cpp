@@ -41,11 +41,8 @@ int main(int argc, char** argv)
       app().register_plugin<monitor_api_plugin>();
       if(!app().initialize<monitor_api_plugin, http_plugin>(argc, argv))
          return -1;
-//      auto& http = app().get_plugin<http_plugin>();
-//      http.add_handler("/v1/monitor/test", [](string, string, url_response_callback cb)
-//      {
-//          cb(200, "{\"param\":\"test\"}");
-//      } );
+
+      app().get_plugin<monitor_api_plugin>().monitor_app();
       app().startup();
       app().exec();
    } catch (const fc::exception& e) {

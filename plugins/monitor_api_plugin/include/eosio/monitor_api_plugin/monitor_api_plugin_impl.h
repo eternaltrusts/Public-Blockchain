@@ -1,47 +1,12 @@
 #pragma once
 
-#include "eosio/monitor_api_plugin/CLI11.hpp"
 #include "eosio/monitor_api_plugin/httpc.hpp"
 #include "eosio/monitor_api_plugin/objects.hpp"
 
-#include <vector>
-//#include <string>
-#include <regex>
-#include <iostream>
-#include <fc/crypto/hex.hpp>
+#include <eosio/chain_plugin/chain_plugin.hpp>
+
 #include <fc/variant.hpp>
-#include <fc/io/datastream.hpp>
 #include <fc/io/json.hpp>
-#include <fc/io/console.hpp>
-#include <fc/exception/exception.hpp>
-#include <fc/variant_object.hpp>
-#include <fc/log/log_message.hpp>
-#include <eosio/utilities/key_conversion.hpp>
-
-#include <eosio/chain/exceptions.hpp>
-#include <eosio/chain/name.hpp>
-#include <eosio/chain/config.hpp>
-#include <eosio/chain/wast_to_wasm.hpp>
-#include <eosio/chain/trace.hpp>
-
-#pragma push_macro("N")
-#undef N
-
-#include <boost/asio.hpp>
-#include <boost/format.hpp>
-#include <boost/dll/runtime_symbol_info.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/process.hpp>
-#include <boost/process/spawn.hpp>
-#include <boost/range/algorithm/find_if.hpp>
-#include <boost/range/algorithm/sort.hpp>
-#include <boost/range/adaptor/transformed.hpp>
-#include <boost/algorithm/string/predicate.hpp>
-#include <boost/algorithm/string/split.hpp>
-#include <boost/range/algorithm/copy.hpp>
-#include <boost/algorithm/string/classification.hpp>
-
-#pragma pop_macro("N")
 
 namespace eosio {
 using namespace eosio::chain;
@@ -52,6 +17,8 @@ public:
     monitor_api_plugin_impl();
 
     eosio::structures::result push_action(const structures::eos_trx &data, const structures::params &params);
+
+    void monitor_app();
 
     void set_list_nodes(const vector<string> &nodes);
     void set_list_wallets(const vector<string> &wallets);
@@ -99,7 +66,9 @@ private:
     eosio::client::http::http_context _context;
 
     bool _no_verify = false;
-    vector<string> headers;
+    bool _is_monitor_app;
+
+    vector<string> _headers;
     vector<string> _nodes;
     vector<string> _wallets;
 
