@@ -11,11 +11,11 @@
 
 #include "eosio/monitor_api_plugin/monitor_api_plugin_impl.h"
 
-namespace eosio { namespace detail {
-  struct monitor_api_plugin_empty {};
-}}
+//namespace eosio { namespace detail {
+//  struct monitor_api_plugin_empty {};
+//}}
 
-FC_REFLECT(eosio::detail::monitor_api_plugin_empty, );
+//FC_REFLECT(eosio::detail::monitor_api_plugin_empty, );
 
 #define CALL(api_name, api_handle, call_name, INVOKE, http_response_code) \
 {std::string("/v1/" #api_name "/" #call_name), \
@@ -32,18 +32,22 @@ FC_REFLECT(eosio::detail::monitor_api_plugin_empty, );
 
 #define INVOKE_V_V(api_handle, call_name) \
      api_handle->call_name(); \
-     eosio::detail::monitor_api_plugin_empty result;
+     eosio::structures::empty_responce result;
 
+#define INVOKE_R_V(api_handle, call_name) \
+     auto result = api_handle->call_name();
+
+#define INVOKE_R_R_R(api_handle, call_name, in_param0, in_param1) \
+     const auto& vs = fc::json::json::from_string(body).as<fc::variants>(); \
+     auto result = api_handle->call_name(vs.at(0).as<in_param0>(), vs.at(1).as<in_param1>());
 
 
 namespace eosio {
    static appbase::abstract_plugin& _monitor_api_plugin = app().register_plugin<monitor_api_plugin>();
 
-
 monitor_api_plugin::monitor_api_plugin()
     : _monitor_api_plugin_impl(new monitor_api_plugin_impl())
 {}
-
 
 void monitor_api_plugin::set_program_options(options_description&, options_description& cfg) {
    cfg.add_options()
@@ -68,14 +72,16 @@ void monitor_api_plugin::plugin_startup() {
     ilog("starting monitor_api_plugin");
 
     app().get_plugin<http_plugin>().add_api({
-         CALL(monitor, _monitor_api_plugin_impl, call, INVOKE_V_V(_monitor_api_plugin_impl, call_test), 200)
+         CALL(monitor, _monitor_api_plugin_impl, call, INVOKE_V_V(_monitor_api_plugin_impl, call_test), 200),
+         CALL(monitor, _monitor_api_plugin_impl, push, INVOKE_R_R_R(_monitor_api_plugin_impl, push_action,
+                                                eosio::structures::eos_trx, eosio::structures::params), 200)
     });
 }
 
 void monitor_api_plugin::plugin_shutdown() {
 }
+}
 
 #undef INVOKE_V_V
+#undef INVOKE_R_V
 #undef CALL
-
-}

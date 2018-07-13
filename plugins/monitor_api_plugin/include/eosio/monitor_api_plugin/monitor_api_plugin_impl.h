@@ -2,9 +2,10 @@
 
 #include "eosio/monitor_api_plugin/CLI11.hpp"
 #include "eosio/monitor_api_plugin/httpc.hpp"
+#include "eosio/monitor_api_plugin/objects.hpp"
 
 #include <vector>
-#include <string>
+//#include <string>
 #include <regex>
 #include <iostream>
 #include <fc/crypto/hex.hpp>
@@ -22,8 +23,6 @@
 #include <eosio/chain/config.hpp>
 #include <eosio/chain/wast_to_wasm.hpp>
 #include <eosio/chain/trace.hpp>
-#include <eosio/chain_plugin/chain_plugin.hpp>
-#include <eosio/chain/contract_types.hpp>
 
 #pragma push_macro("N")
 #undef N
@@ -53,9 +52,7 @@ public:
     monitor_api_plugin_impl();
     void call_test();
 
-    void push_action();
-    void push_transaction();
-    void push_transactions();
+    eosio::structures::result push_action(const structures::eos_trx &data, const structures::params &params);
 
     void set_list_nodes(const vector<string> &nodes);
     void set_list_wallets(const vector<string> &wallets);
@@ -72,7 +69,8 @@ private:
     string generate_nonce_string();
     chain::action generate_nonce_action();
     fc::variant determine_required_keys(const signed_transaction& trx);
-    void sign_transaction(signed_transaction& trx, fc::variant& required_keys, const chain_id_type& chain_id);
+
+    void sign_transaction(signed_transaction& trx, fc::variant &required_keys, const chain_id_type& chain_id);
 
     fc::variant push_transaction(signed_transaction& trx, int32_t extra_kcpu = 1000, packed_transaction::compression_type compression = packed_transaction::none);
     fc::variant push_actions(std::vector<chain::action>&& actions, int32_t extra_kcpu, packed_transaction::compression_type compression = packed_transaction::none);
@@ -81,7 +79,7 @@ private:
     void print_action_tree(const fc::variant& action);
     void print_result(const fc::variant& result);
 
-    void send_actions(std::vector<chain::action>&& actions, int32_t extra_kcpu = 1000, packed_transaction::compression_type compression = packed_transaction::none);
+    structures::result send_actions(std::vector<chain::action>&& actions, int32_t extra_kcpu = 1000, packed_transaction::compression_type compression = packed_transaction::none);
     void send_transaction(signed_transaction& trx, int32_t extra_kcpu, packed_transaction::compression_type compression = packed_transaction::none);
 
     chain::action create_action(const vector<permission_level>& authorization, const account_name& code, const action_name& act, const fc::variant& args);
@@ -93,12 +91,15 @@ private:
 
     string is_valid_url(const string &url);
 
+
+    optional<signature_type> try_sign_digest(const digest_type digest, const public_key_type public_key);
+
 private:
     eosio::client::http::http_context _context;
 
-    string url = "http://localhost:8888/";
-    string wallet_url = "http://localhost:8900/";
-    bool no_verify = false;
+    string _url = "http://localhost:8888/";
+    string _wallet_url = "http://localhost:8900/";
+    bool _no_verify = false;
 
     vector<string> headers;
     vector<string> _nodes;
