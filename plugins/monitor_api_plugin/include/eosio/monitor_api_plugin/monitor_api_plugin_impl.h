@@ -50,39 +50,40 @@ class monitor_api_plugin_impl
 {
 public:
     monitor_api_plugin_impl();
-    void call_test();
 
     eosio::structures::result push_action(const structures::eos_trx &data, const structures::params &params);
 
     void set_list_nodes(const vector<string> &nodes);
     void set_list_wallets(const vector<string> &wallets);
 
+    eosio::structures::result clear_list_nodes();
+    eosio::structures::result add_nodes(const vector<string> &nodes);
+    eosio::structures::result remove_nodes(const vector<string> &nodes);
+
 private:
     template<typename T>
     fc::variant call(const std::string& url, const std::string& path, const T& v);
-    template<typename T>
-    fc::variant call( const std::string& path, const T& v);
     fc::variant call(const std::string& url, const std::string& path);
 
-    eosio::chain_apis::read_only::get_info_results get_info();
+    eosio::chain_apis::read_only::get_info_results get_info(const string &url);
     vector<chain::permission_level> get_account_permissions(const vector<string>& permissions);
     string generate_nonce_string();
     chain::action generate_nonce_action();
-    fc::variant determine_required_keys(const signed_transaction& trx);
+    fc::variant determine_required_keys(const string &url, const string &wallet_url, const signed_transaction& trx);
 
-    void sign_transaction(signed_transaction& trx, fc::variant &required_keys, const chain_id_type& chain_id);
+    void sign_transaction(const string &wallet_url, signed_transaction& trx, fc::variant &required_keys, const chain_id_type& chain_id);
 
-    fc::variant push_transaction(signed_transaction& trx, int32_t extra_kcpu = 1000, packed_transaction::compression_type compression = packed_transaction::none);
-    fc::variant push_actions(std::vector<chain::action>&& actions, int32_t extra_kcpu, packed_transaction::compression_type compression = packed_transaction::none);
+    fc::variant push_transaction(const string &url, signed_transaction& trx, int32_t extra_kcpu = 1000, packed_transaction::compression_type compression = packed_transaction::none);
+    fc::variant push_actions(const string &url, std::vector<chain::action>&& actions, int32_t extra_kcpu, packed_transaction::compression_type compression = packed_transaction::none);
 
     void print_action(const fc::variant& at);
     void print_action_tree(const fc::variant& action);
     void print_result(const fc::variant& result);
 
-    structures::result send_actions(std::vector<chain::action>&& actions, int32_t extra_kcpu = 1000, packed_transaction::compression_type compression = packed_transaction::none);
-    void send_transaction(signed_transaction& trx, int32_t extra_kcpu, packed_transaction::compression_type compression = packed_transaction::none);
+    structures::result send_actions(const string &url, std::vector<chain::action>&& actions, int32_t extra_kcpu = 1000, packed_transaction::compression_type compression = packed_transaction::none);
+    void send_transaction(const string &url, signed_transaction& trx, int32_t extra_kcpu, packed_transaction::compression_type compression = packed_transaction::none);
 
-    chain::action create_action(const vector<permission_level>& authorization, const account_name& code, const action_name& act, const fc::variant& args);
+    chain::action create_action(const string &url, const vector<permission_level>& authorization, const account_name& code, const action_name& act, const fc::variant& args);
 
     fc::variant json_from_file_or_string(const string& file_or_str, fc::json::parse_type ptype = fc::json::legacy_parser);
 
@@ -97,10 +98,7 @@ private:
 private:
     eosio::client::http::http_context _context;
 
-    string _url = "http://localhost:8888/";
-    string _wallet_url = "http://localhost:8900/";
     bool _no_verify = false;
-
     vector<string> headers;
     vector<string> _nodes;
     vector<string> _wallets;

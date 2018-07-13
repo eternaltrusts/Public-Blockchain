@@ -3,6 +3,8 @@
 using namespace std;
 using namespace eosio::client::http;
 
+//const static std::string default_url = "http://localhost:8888/";
+const static std::string default_wallet_url = "http://localhost:8900/";
 
 eosio::monitor_api_plugin_impl::monitor_api_plugin_impl()
     : _print_request(false)
@@ -17,43 +19,21 @@ eosio::monitor_api_plugin_impl::monitor_api_plugin_impl()
     _context = eosio::client::http::create_http_context();
 }
 
-// TODO test method
-void eosio::monitor_api_plugin_impl::call_test() {
-    ilog(__FUNCTION__);
-
-
-        string data = "{\"account\": \"currency\", \"transaction_id\": \"test test test\"}";
-        fc::variant action_args_var;
-        if( !data.empty() ) {
-            try {
-                action_args_var = json_from_file_or_string(data, fc::json::relaxed_parser);
-            } EOS_RETHROW_EXCEPTIONS(action_type_exception, "Fail to parse action JSON data='${data}'", ("data", data))
-        }
-
-        auto arg= fc::mutable_variant_object
-                ("code", "contr")  // contract name
-                ("action", "createtrx") // action
-                ("args", action_args_var);
-        auto result = call(json_to_bin_func, arg);
-
-        auto accountPermissions = get_account_permissions(vector<string>{"currency"});
-        send_actions({chain::action{accountPermissions, "contr", "createtrx", result.get_object()["binargs"].as<bytes>()}});
-
-}
-
 eosio::structures::result eosio::monitor_api_plugin_impl::push_action(const eosio::structures::eos_trx &data,
                                                                       const structures::params &params) {
     abi_serializer::set_max_serialization_time(fc::seconds(1));
 
+    if (!_nodes.size())
+        return eosio::structures::result(false, "There is no list of nodes!");
+
     std::map<std::string, eosio::structures::result> map_result;
     for (const string addr_node : _nodes) {
-        _url = is_valid_url(addr_node);
+//        _url = is_valid_url(addr_node);
 
         if (!data.is_valid())
             return eosio::structures::result(false, "field is empty transaction_id");
 
         fc::variant action_args_var;
-
             try {
                 action_args_var = json_from_file_or_string(fc::json::to_string(data), fc::json::relaxed_parser);
             } catch (...) {
@@ -66,11 +46,10 @@ eosio::structures::result eosio::monitor_api_plugin_impl::push_action(const eosi
                 ("code", params.contract)  // contract name
                 ("action", params.action)  // action
                 ("args", action_args_var);
-        auto result = call(json_to_bin_func, arg);
-
+        auto result = call(is_valid_url(addr_node), json_to_bin_func, arg);
         auto accountPermissions = get_account_permissions(params.permissions);
 
-        auto obj = send_actions({chain::action{accountPermissions, params.contract, params.action, result.get_object()["binargs"].as<bytes>()}});
+        auto obj = send_actions(is_valid_url(addr_node), {chain::action{accountPermissions, params.contract, params.action, result.get_object()["binargs"].as<bytes>()}});
         map_result.insert(std::pair<std::string, eosio::structures::result>(addr_node, obj));
     }
 
@@ -87,11 +66,37 @@ eosio::structures::result eosio::monitor_api_plugin_impl::push_action(const eosi
 }
 
 void eosio::monitor_api_plugin_impl::set_list_nodes(const vector<fc::string> &nodes) {
-    _nodes = nodes;
+    for (auto node : nodes)
+        _nodes.push_back(is_valid_url(node));
 }
 
 void eosio::monitor_api_plugin_impl::set_list_wallets(const vector<string> &wallets) {
     _wallets = wallets;
+}
+
+eosio::structures::result eosio::monitor_api_plugin_impl::clear_list_nodes() {
+    _nodes.clear();
+    return eosio::structures::result(true);
+}
+
+eosio::structures::result eosio::monitor_api_plugin_impl::add_nodes(const vector<fc::string> &nodes) {
+    for (auto node : nodes) {
+        auto it = std::find(_nodes.begin(), _nodes.end(), is_valid_url(node));
+        if (it == _nodes.end())
+            _nodes.push_back(is_valid_url(node));
+    }
+
+    return eosio::structures::result(true);
+}
+
+eosio::structures::result eosio::monitor_api_plugin_impl::remove_nodes(const vector<fc::string> &nodes) {
+    for (auto node : nodes) {
+        auto it = std::find(_nodes.begin(), _nodes.end(), is_valid_url(node));
+        if (it != _nodes.end())
+            _nodes.erase(it);
+    }
+
+    return eosio::structures::result(true);
 }
 
 template<typename T>
@@ -103,26 +108,16 @@ fc::variant eosio::monitor_api_plugin_impl::call(const std::string &url, const s
        return eosio::client::http::do_http_call( *cp, fc::variant(v), _print_request, _print_response );
     }
     catch(boost::system::system_error& e) {
-         ilog(e.what());
- //      if(url == ::url)
- //         std::cerr << localized("Failed to connect to nodeos at ${u}; is nodeos running?", ("u", url)) << std::endl;
- //      else if(url == ::wallet_url)
- //         std::cerr << localized("Failed to connect to keosd at ${u}; is keosd running?", ("u", url)) << std::endl;
- //      throw connection_exception(fc::log_messages{FC_LOG_MESSAGE(error, e.what())});
+         elog(e.what());
     }
-}
-
-template<typename T>
-fc::variant eosio::monitor_api_plugin_impl::call(const std::string &path, const T &v) {
-    return call(_url, path, fc::variant(v));
 }
 
 fc::variant eosio::monitor_api_plugin_impl::call(const std::string &url, const std::string &path) {
     return call(url, path, fc::variant());
 }
 
-eosio::chain_apis::read_only::get_info_results eosio::monitor_api_plugin_impl::get_info() {
-    return call(_url, get_info_func).as<eosio::chain_apis::read_only::get_info_results>();
+eosio::chain_apis::read_only::get_info_results eosio::monitor_api_plugin_impl::get_info(const string &url) {
+    return call(url, get_info_func).as<eosio::chain_apis::read_only::get_info_results>();
 }
 
 vector<eosio::chain::permission_level> eosio::monitor_api_plugin_impl::get_account_permissions(const vector<string> &permissions) {
@@ -145,23 +140,25 @@ eosio::chain::action eosio::monitor_api_plugin_impl::generate_nonce_action() {
         return chain::action( {}, eosio::chain::config::null_account_name, "nonce", fc::raw::pack(fc::time_point::now().time_since_epoch().count()));
 }
 
-fc::variant eosio::monitor_api_plugin_impl::determine_required_keys(const eosio::chain::signed_transaction &trx) {
-    const auto& public_keys = call(is_valid_url(_wallet_url), wallet_public_keys);
+fc::variant eosio::monitor_api_plugin_impl::determine_required_keys(const string &url, const string &wallet_url, const eosio::chain::signed_transaction &trx) {
+    const auto& public_keys = call(wallet_url, wallet_public_keys);
     auto get_arg = fc::mutable_variant_object
             ("transaction", (transaction)trx)
             ("available_keys", public_keys);
-    const auto& required_keys = call(get_required_keys, get_arg);
+    const auto& required_keys = call(url, get_required_keys, get_arg);
     return required_keys["required_keys"];
 }
 
-void eosio::monitor_api_plugin_impl::sign_transaction(eosio::chain::signed_transaction &trx, fc::variant &required_keys, const eosio::chain::chain_id_type &chain_id) {
+void eosio::monitor_api_plugin_impl::sign_transaction(const string &wallet_url, eosio::chain::signed_transaction &trx,
+                                                      fc::variant &required_keys, const eosio::chain::chain_id_type &chain_id) {
     fc::variants sign_args = {fc::variant(trx), required_keys, fc::variant(chain_id)};
-    const auto& signed_trx = call(is_valid_url(_wallet_url), wallet_sign_trx, sign_args);
+    const auto& signed_trx = call(wallet_url, wallet_sign_trx, sign_args);
     trx = signed_trx.as<signed_transaction>();
 }
 
-fc::variant eosio::monitor_api_plugin_impl::push_transaction(eosio::chain::signed_transaction &trx, int32_t extra_kcpu, eosio::chain::packed_transaction::compression_type compression) {
-    auto info = get_info();
+fc::variant eosio::monitor_api_plugin_impl::push_transaction(const string &url, eosio::chain::signed_transaction &trx,
+                                                             int32_t extra_kcpu, eosio::chain::packed_transaction::compression_type compression) {
+    auto info = get_info(url);
     trx.expiration = info.head_block_time + fc::seconds(30);
 
     // Set tapos, default to last irreversible block if it's not specified by the user
@@ -169,7 +166,7 @@ fc::variant eosio::monitor_api_plugin_impl::push_transaction(eosio::chain::signe
     try {
        fc::variant ref_block;
        if (!_tx_ref_block_num_or_id.empty()) {
-          ref_block = call(get_block_func, fc::mutable_variant_object("block_num_or_id", _tx_ref_block_num_or_id));
+          ref_block = call(url, get_block_func, fc::mutable_variant_object("block_num_or_id", _tx_ref_block_num_or_id));
           ref_block_id = ref_block["id"].as<block_id_type>();
        }
     } EOS_RETHROW_EXCEPTIONS(invalid_ref_block_exception, "Invalid reference block num or id: ${block_num_or_id}", ("block_num_or_id", _tx_ref_block_num_or_id));
@@ -183,22 +180,23 @@ fc::variant eosio::monitor_api_plugin_impl::push_transaction(eosio::chain::signe
     trx.max_net_usage_words = (_tx_max_net_usage + 7)/8;
 
     if (!_tx_skip_sign) {
-       auto required_keys = determine_required_keys(trx);
-       sign_transaction(trx, required_keys, info.chain_id);
+       auto required_keys = determine_required_keys(url, default_wallet_url, trx);
+       sign_transaction(default_wallet_url, trx, required_keys, info.chain_id);
     }
 
     if (!_tx_dont_broadcast) {
-       return call(push_txn_func, packed_transaction(trx, compression));
+       return call(url, push_txn_func, packed_transaction(trx, compression));
     } else {
        return fc::variant(trx);
     }
 }
 
-fc::variant eosio::monitor_api_plugin_impl::push_actions(std::vector<eosio::chain::action> &&actions, int32_t extra_kcpu, eosio::chain::packed_transaction::compression_type compression) {
+fc::variant eosio::monitor_api_plugin_impl::push_actions(const string &url, std::vector<eosio::chain::action> &&actions,
+                                                         int32_t extra_kcpu, eosio::chain::packed_transaction::compression_type compression) {
     signed_transaction trx;
     trx.actions = std::forward<decltype(actions)>(actions);
 
-    return push_transaction(trx, extra_kcpu, compression);
+    return push_transaction(url, trx, extra_kcpu, compression);
 }
 
 void eosio::monitor_api_plugin_impl::print_action(const fc::variant &at) {
@@ -276,31 +274,35 @@ void eosio::monitor_api_plugin_impl::print_result(const fc::variant &result) {
         }
     } FC_CAPTURE_AND_RETHROW( (result) ) }
 
-eosio::structures::result eosio::monitor_api_plugin_impl::send_actions(std::vector<eosio::chain::action> &&actions, int32_t extra_kcpu, eosio::chain::packed_transaction::compression_type compression) {
-        auto result = push_actions(move(actions), extra_kcpu, compression);
+eosio::structures::result eosio::monitor_api_plugin_impl::send_actions(const string &url,
+                                                                       std::vector<eosio::chain::action> &&actions, int32_t extra_kcpu,
+                                                                       eosio::chain::packed_transaction::compression_type compression) {
+        auto result = push_actions(url ,move(actions), extra_kcpu, compression);
         if (result.is_object() && result.get_object().contains("processed"))
             return eosio::structures::result(true, fc::json::to_pretty_string(result));
         else
             return eosio::structures::result(false, fc::json::to_pretty_string(result));
 }
 
-void eosio::monitor_api_plugin_impl::send_transaction(eosio::chain::signed_transaction &trx, int32_t extra_kcpu, eosio::chain::packed_transaction::compression_type compression) {
-    auto result = push_transaction(trx, extra_kcpu, compression);
+void eosio::monitor_api_plugin_impl::send_transaction(const string &url, eosio::chain::signed_transaction &trx,
+                                                      int32_t extra_kcpu, eosio::chain::packed_transaction::compression_type compression) {
+    auto result = push_transaction(url, trx, extra_kcpu, compression);
 
     if(_tx_print_json) {
-       std::cout << fc::json::to_pretty_string( result ) << endl;
+       std::cout << fc::json::to_pretty_string(result) << endl;
     } else {
        print_result(result);
     }
 }
 
-eosio::chain::action eosio::monitor_api_plugin_impl::create_action(const vector<eosio::chain::permission_level> &authorization, const eosio::chain::account_name &code, const eosio::chain::action_name &act, const fc::variant &args) {
+eosio::chain::action eosio::monitor_api_plugin_impl::create_action(const string &url, const vector<eosio::chain::permission_level> &authorization,
+                                                                   const eosio::chain::account_name &code, const eosio::chain::action_name &act, const fc::variant &args) {
     auto arg = fc::mutable_variant_object()
        ("code", code)
        ("action", act)
        ("args", args);
 
-    auto result = call(json_to_bin_func, arg);
+    auto result = call(url, json_to_bin_func, arg);
     wdump((result)(arg));
     return chain::action{authorization, code, act, result.get_object()["binargs"].as<bytes>()};
  }
