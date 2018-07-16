@@ -27,6 +27,9 @@ public:
     eosio::structures::result add_nodes(const vector<string> &nodes);
     eosio::structures::result remove_nodes(const vector<string> &nodes);
 
+    std::vector<string> get_addr_nodes();
+
+
 private:
     template<typename T>
     fc::variant call(const std::string& url, const std::string& path, const T& v);
@@ -38,7 +41,8 @@ private:
     chain::action generate_nonce_action();
     fc::variant determine_required_keys(const string &url, const string &wallet_url, const signed_transaction& trx);
 
-    void sign_transaction(const string &wallet_url, signed_transaction& trx, fc::variant &required_keys, const chain_id_type& chain_id);
+
+    void sign_transaction(const string &wallet_url, signed_transaction& trx, variant &required_keys, const chain_id_type& chain_id);
 
     fc::variant push_transaction(const string &url, signed_transaction& trx, int32_t extra_kcpu = 1000, packed_transaction::compression_type compression = packed_transaction::none);
     fc::variant push_actions(const string &url, std::vector<chain::action>&& actions, int32_t extra_kcpu, packed_transaction::compression_type compression = packed_transaction::none);

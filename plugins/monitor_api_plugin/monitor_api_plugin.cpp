@@ -70,6 +70,7 @@ void monitor_api_plugin::plugin_startup() {
     ilog("starting monitor_api_plugin");
 
     app().get_plugin<http_plugin>().add_api({
+        CALL(monitor, _monitor_api_plugin_impl, list_nodes, INVOKE_R_V(_monitor_api_plugin_impl, get_addr_nodes), 200),
         CALL(monitor, _monitor_api_plugin_impl, clear_list_nodes, INVOKE_R_V(_monitor_api_plugin_impl, clear_list_nodes), 200),
         CALL(monitor, _monitor_api_plugin_impl, add_nodes, INVOKE_R_LR(_monitor_api_plugin_impl, add_nodes, vector<string>), 200),
         CALL(monitor, _monitor_api_plugin_impl, remove_nodes, INVOKE_R_LR(_monitor_api_plugin_impl, remove_nodes, vector<string>), 200),

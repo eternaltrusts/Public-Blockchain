@@ -20,7 +20,7 @@ public:
     monitor_api_plugin();
     virtual ~monitor_api_plugin() = default;
 
-    APPBASE_PLUGIN_REQUIRES((http_plugin)(wallet_plugin))
+    APPBASE_PLUGIN_REQUIRES(/*(http_plugin)(wallet_plugin)*/)
 
     virtual void set_program_options(options_description&, options_description& cfg) override;
 

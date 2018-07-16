@@ -55,7 +55,6 @@ eosio::structures::result eosio::monitor_api_plugin_impl::push_action(const eosi
                 return eosio::structures::result(false, error_msg);
             }
 
-
         auto arg= fc::mutable_variant_object
                 ("code", params.contract)  // contract name
                 ("action", params.action)  // action
@@ -75,7 +74,7 @@ eosio::structures::result eosio::monitor_api_plugin_impl::push_action(const eosi
     }
 
     if (passed >= failed_to)
-        return eosio::structures::result(true);
+        return eosio::structures::result(true, "Transactions successful");
     return eosio::structures::result(false, "Requests have not passed");
 }
 
@@ -117,6 +116,10 @@ eosio::structures::result eosio::monitor_api_plugin_impl::remove_nodes(const vec
     return eosio::structures::result(true);
 }
 
+std::vector<string> eosio::monitor_api_plugin_impl::get_addr_nodes() {
+    return _nodes;
+}
+
 template<typename T>
 fc::variant eosio::monitor_api_plugin_impl::call(const std::string &url, const std::string &path, const T &v) {
     try {
@@ -155,31 +158,30 @@ string eosio::monitor_api_plugin_impl::generate_nonce_string() {
 }
 
 eosio::chain::action eosio::monitor_api_plugin_impl::generate_nonce_action() {
-        return chain::action( {}, eosio::chain::config::null_account_name, "nonce", fc::raw::pack(fc::time_point::now().time_since_epoch().count()));
+    return chain::action( {}, eosio::chain::config::null_account_name, "nonce", fc::raw::pack(fc::time_point::now().time_since_epoch().count()));
 }
 
 fc::variant eosio::monitor_api_plugin_impl::determine_required_keys(const string &url, const string &wallet_url, const eosio::chain::signed_transaction &trx) {
+    fc::variant public_keys;
     if (_is_monitor_app) {
-        const auto& public_keys = call(wallet_url, wallet_public_keys);
-        auto get_arg = fc::mutable_variant_object
-                ("transaction", (transaction)trx)
-                ("available_keys", public_keys);
-        const auto& required_keys = call(url, get_required_keys, get_arg);
-        return required_keys["required_keys"];
+        public_keys = call(wallet_url, wallet_public_keys);
     } else {
-        return fc::variant();
+        auto& wallet_mgr = app().get_plugin<wallet_plugin>().get_wallet_manager();
+        public_keys = fc::variant(wallet_mgr.get_public_keys());
     }
+
+    auto get_arg = fc::mutable_variant_object
+            ("transaction", (transaction)trx)
+            ("available_keys", public_keys);
+    const auto& required_keys = call(url, get_required_keys, get_arg);
+    return required_keys["required_keys"];
 }
 
 void eosio::monitor_api_plugin_impl::sign_transaction(const string &wallet_url, eosio::chain::signed_transaction &trx,
                                                       fc::variant &required_keys, const eosio::chain::chain_id_type &chain_id) {
-    if (_is_monitor_app) {
-        fc::variants sign_args = {fc::variant(trx), required_keys, fc::variant(chain_id)};
-        const auto& signed_trx = call(wallet_url, wallet_sign_trx, sign_args);
-        trx = signed_trx.as<signed_transaction>();
-    } else {
-//        auto& wallet_mgr = app().get_plugin<wallet_plugin>().get_wallet_manager();
-    }
+    fc::variants sign_args = {fc::variant(trx), required_keys, fc::variant(chain_id)};
+    const auto& signed_trx = call(wallet_url, wallet_sign_trx, sign_args);
+    trx = signed_trx.as<signed_transaction>();
 }
 
 fc::variant eosio::monitor_api_plugin_impl::push_transaction(const string &url, eosio::chain::signed_transaction &trx,
@@ -206,8 +208,15 @@ fc::variant eosio::monitor_api_plugin_impl::push_transaction(const string &url, 
     trx.max_net_usage_words = (_tx_max_net_usage + 7)/8;
 
     if (!_tx_skip_sign) {
-       auto required_keys = determine_required_keys(url, default_wallet_url, trx);
-       sign_transaction(default_wallet_url, trx, required_keys, info.chain_id);
+        auto public_keys = determine_required_keys(url, default_wallet_url, trx);
+        if(_is_monitor_app) {
+            sign_transaction(default_wallet_url, trx, public_keys, info.chain_id);
+        } else {
+            auto& wallet_mgr = app().get_plugin<wallet_plugin>().get_wallet_manager();
+            flat_set<public_key_type> required_keys;
+            fc::from_variant(public_keys, required_keys);
+            trx = wallet_mgr.sign_transaction(trx, required_keys, info.chain_id);
+        }
     }
 
     if (!_tx_dont_broadcast) {
