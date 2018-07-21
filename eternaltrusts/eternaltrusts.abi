@@ -33,7 +33,7 @@
   ],
   "actions": [
     {
-      "name": "createtrx",
+      "name": "addtrx",
       "type": "no_id_transaction",
       "ricardian_contract": ""
     }
