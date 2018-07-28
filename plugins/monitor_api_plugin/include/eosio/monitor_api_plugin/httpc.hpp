@@ -3,11 +3,21 @@
  *  @copyright defined in eos/LICENSE.txt
  */
 #pragma once
-#include <string>
-#include <vector>
-#include <fc/variant.hpp>
 
-using namespace std;
+#include <iostream>
+#include <istream>
+#include <ostream>
+#include <string>
+#include <regex>
+#include <boost/algorithm/string.hpp>
+#include <boost/asio.hpp>
+#include <boost/asio/ssl.hpp>
+#include <fc/variant.hpp>
+#include <fc/io/json.hpp>
+#include <eosio/chain/exceptions.hpp>
+#include <eosio/http_plugin/http_plugin.hpp>
+#include <eosio/chain_plugin/chain_plugin.hpp>
+
 namespace eosio { namespace client { namespace http {
 
    namespace detail {
@@ -18,7 +28,7 @@ namespace eosio { namespace client { namespace http {
       };
    }
 
-   using http_context = unique_ptr<detail::http_context_impl, detail::http_context_deleter>;
+   using http_context = std::unique_ptr<detail::http_context_impl, detail::http_context_deleter>;
 
    http_context create_http_context();
 
@@ -40,7 +50,7 @@ namespace eosio { namespace client { namespace http {
    struct resolved_url : parsed_url {
       resolved_url( const parsed_url& url, vector<string>&& resolved_addresses, uint16_t resolved_port, bool is_loopback)
       :parsed_url(url)
-      ,resolved_addresses(move(resolved_addresses))
+      ,resolved_addresses(std::move(resolved_addresses))
       ,resolved_port(resolved_port)
       ,is_loopback(is_loopback)
       {
@@ -58,19 +68,19 @@ namespace eosio { namespace client { namespace http {
       const http_context& context;
       resolved_url url;
       bool verify_cert;
-      vector<string>& headers;
+      std::vector<string>& headers;
 
       connection_param( const http_context& context,
                         const resolved_url& url,
                         bool verify,
-                        vector<string>& h) : context(context),url(url), headers(h) {
+                        std::vector<string>& h) : context(context),url(url), headers(h) {
          verify_cert = verify;
       }
 
       connection_param( const http_context& context,
                         const parsed_url& url,
                         bool verify,
-                        vector<string>& h) : context(context),url(resolve_url(context, url)), headers(h) {
+                        std::vector<string>& h) : context(context),url(resolve_url(context, url)), headers(h) {
          verify_cert = verify;
       }
    };
@@ -92,9 +102,11 @@ namespace eosio { namespace client { namespace http {
    const string get_table_func = chain_func_base + "/get_table_rows";
    const string get_code_func = chain_func_base + "/get_code";
    const string get_abi_func = chain_func_base + "/get_abi";
+   const string get_raw_code_and_abi_func = chain_func_base + "/get_raw_code_and_abi";
    const string get_currency_balance_func = chain_func_base + "/get_currency_balance";
    const string get_currency_stats_func = chain_func_base + "/get_currency_stats";
    const string get_producers_func = chain_func_base + "/get_producers";
+   const string get_schedule_func = chain_func_base + "/get_producer_schedule";
    const string get_required_keys = chain_func_base + "/get_required_keys";
 
 
@@ -128,4 +140,6 @@ namespace eosio { namespace client { namespace http {
    const string wallet_create_key = wallet_func_base + "/create_key";
    const string wallet_sign_trx = wallet_func_base + "/sign_transaction";
    const string keosd_stop = "/v1/keosd/stop";
+
+   FC_DECLARE_EXCEPTION( connection_exception, 1100000, "Connection Exception" );
  }}}

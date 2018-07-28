@@ -9,8 +9,6 @@
 #include <fc/variant.hpp>
 #include <fc/io/json.hpp>
 
-#include "eosio/monitor_api_plugin/monitor_api_plugin_impl.h"
-
 #define CALL(api_name, api_handle, call_name, INVOKE, http_response_code) \
 {std::string("/v1/" #api_name "/" #call_name), \
    [this](string, string body, url_response_callback cb) mutable { \

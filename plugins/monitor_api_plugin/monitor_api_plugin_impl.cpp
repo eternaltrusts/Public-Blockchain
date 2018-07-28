@@ -36,8 +36,6 @@ eosio::monitor_api_plugin_impl::monitor_api_plugin_impl()
 
 eosio::structures::result eosio::monitor_api_plugin_impl::push_action(const eosio::structures::eos_trx &data,
                                                                       const structures::params &params) {
-    abi_serializer::set_max_serialization_time(fc::seconds(1));
-
     if (!_nodes.size())
         return eosio::structures::result(false, "There is no list of nodes!");
 

@@ -7,6 +7,8 @@
 #include <eosio/wallet_plugin/wallet_plugin.hpp>
 #include <appbase/application.hpp>
 
+#include "eosio/monitor_api_plugin/monitor_api_plugin_impl.h"
+
 namespace eosio {
 
 using namespace appbase;
