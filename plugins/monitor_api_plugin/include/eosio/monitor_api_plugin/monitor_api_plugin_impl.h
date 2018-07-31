@@ -16,7 +16,7 @@ class monitor_api_plugin_impl
 public:
     monitor_api_plugin_impl();
 
-    eosio::structures::result push_action(const structures::eos_trx &data, const structures::params &params);
+    eosio::structures::result push_action(const structures::transaction_hl &trx_hl);
 
     void monitor_app();
 

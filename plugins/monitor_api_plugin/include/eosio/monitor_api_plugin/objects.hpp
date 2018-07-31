@@ -24,10 +24,15 @@ namespace structures {
         }
     };
 
-    struct params {
+    struct params_request {
         std::string contract;
         std::string action;
         std::vector<std::string> permissions;
+    };
+
+    struct transaction_hl {
+        eos_trx         trx;
+        params_request  params;
     };
 }
 }
@@ -35,4 +40,5 @@ namespace structures {
 FC_REFLECT(eosio::structures::empty_responce,);
 FC_REFLECT(eosio::structures::result, (status)(comment));
 FC_REFLECT(eosio::structures::eos_trx, (account)(transaction_id));
-FC_REFLECT(eosio::structures::params, (contract)(action)(permissions));
+FC_REFLECT(eosio::structures::params_request, (contract)(action)(permissions));
+FC_REFLECT(eosio::structures::transaction_hl, (trx)(params));

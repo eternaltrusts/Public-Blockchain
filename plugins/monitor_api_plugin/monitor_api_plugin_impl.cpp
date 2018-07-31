@@ -34,8 +34,10 @@ eosio::monitor_api_plugin_impl::monitor_api_plugin_impl()
     _context = eosio::client::http::create_http_context();
 }
 
-eosio::structures::result eosio::monitor_api_plugin_impl::push_action(const eosio::structures::eos_trx &data,
-                                                                      const structures::params &params) {
+eosio::structures::result eosio::monitor_api_plugin_impl::push_action(const eosio::structures::transaction_hl &trx_hl) {
+    auto data = trx_hl.trx;
+    auto params = trx_hl.params;
+
     if (!_nodes.size())
         return eosio::structures::result(false, "There is no list of nodes!");
 
