@@ -41,7 +41,6 @@ eosio::structures::result eosio::monitor_api_plugin_impl::push_action(const eosi
     if (!_nodes.size())
         return eosio::structures::result(false, "There is no list of nodes!");
 
-    std::map<std::string, eosio::structures::result> map_result;
     for (const string addr_node : _nodes) {
 
         if (!data.is_valid())
@@ -63,19 +62,84 @@ eosio::structures::result eosio::monitor_api_plugin_impl::push_action(const eosi
         auto accountPermissions = get_account_permissions(params.permissions);
 
         auto obj = send_actions(is_valid_url(addr_node), {chain::action{accountPermissions, params.contract, params.action, result.get_object()["binargs"].as<bytes>()}});
-        map_result.insert(std::pair<std::string, eosio::structures::result>(addr_node, obj));
+        if (obj.status)
+            return eosio::structures::result(true, "Transactions successful");
     }
 
-    uint8_t passed = 0;
-    uint8_t failed_to = 0;
-    for (auto it =map_result.begin(); it != map_result.end(); ++it) {
-        if (it->second.status) { ++passed; }
-        else { ++failed_to; }
-    }
-
-    if (passed >= failed_to)
-        return eosio::structures::result(true, "Transactions successful");
     return eosio::structures::result(false, "Requests have not passed");
+}
+
+
+vector<string> tx_permission;
+string proposal_name = "payme";
+string requested_perm = "[{\"actor\": \"contr\", \"permission\": \"active\"}]";
+string transaction_perm = "[{\"actor\": \"currency\", \"permission\": \"active\"}]";
+string proposed_transaction = "{\"account\": \"currency\", \"transaction_id\": \"1\"}";
+string proposed_contract = "contr";
+string proposed_action = "addtrx";
+string proposer;
+unsigned int proposal_expiration_hours = 24;
+
+eosio::structures::result eosio::monitor_api_plugin_impl::push_multisig_action() {
+    fc::variant requested_perm_var;
+    try {
+       requested_perm_var = json_from_file_or_string(requested_perm);
+    } EOS_RETHROW_EXCEPTIONS(transaction_type_exception, "Fail to parse permissions JSON '${data}'", ("data",requested_perm))
+    fc::variant transaction_perm_var;
+    try {
+       transaction_perm_var = json_from_file_or_string(transaction_perm);
+    } EOS_RETHROW_EXCEPTIONS(transaction_type_exception, "Fail to parse permissions JSON '${data}'", ("data",transaction_perm))
+    fc::variant trx_var;
+    try {
+       trx_var = json_from_file_or_string(proposed_transaction);
+    } EOS_RETHROW_EXCEPTIONS(transaction_type_exception, "Fail to parse transaction JSON '${data}'", ("data",proposed_transaction))
+    transaction proposed_trx = trx_var.as<transaction>();
+    bytes proposed_trx_serialized = variant_to_bin( proposed_contract, proposed_action, trx_var );
+
+    vector<permission_level> reqperm;
+    try {
+       reqperm = requested_perm_var.as<vector<permission_level>>();
+    } EOS_RETHROW_EXCEPTIONS(transaction_type_exception, "Wrong requested permissions format: '${data}'", ("data",requested_perm_var));
+
+    vector<permission_level> trxperm;
+    try {
+       trxperm = transaction_perm_var.as<vector<permission_level>>();
+    } EOS_RETHROW_EXCEPTIONS(transaction_type_exception, "Wrong transaction permissions format: '${data}'", ("data",transaction_perm_var));
+
+    auto accountPermissions = get_account_permissions(tx_permission);
+    if (accountPermissions.empty()) {
+       if (!proposer.empty()) {
+          accountPermissions = vector<permission_level>{{proposer, config::active_name}};
+       } else {
+          EOS_THROW(missing_auth_exception, "Authority is not provided (either by multisig parameter <proposer> or -p)");
+       }
+    }
+    if (proposer.empty()) {
+       proposer = name(accountPermissions.at(0).actor).to_string();
+    }
+
+    transaction trx;
+
+    trx.expiration = fc::time_point_sec( fc::time_point::now() + fc::hours(proposal_expiration_hours) );
+    trx.ref_block_num = 0;
+    trx.ref_block_prefix = 0;
+    trx.max_net_usage_words = 0;
+    trx.max_cpu_usage_ms = 0;
+    trx.delay_sec = 0;
+    trx.actions = { chain::action(trxperm, name(proposed_contract), name(proposed_action), proposed_trx_serialized) };
+
+    fc::to_variant(trx, trx_var);
+
+    auto args = fc::mutable_variant_object()
+       ("proposer", proposer )
+       ("proposal_name", proposal_name)
+       ("requested", requested_perm_var)
+       ("trx", trx_var);
+
+    auto url = "http://127.0.01:8888";
+    send_actions(is_valid_url(url), {chain::action{accountPermissions, "currency", "propose", variant_to_bin( N(currency), N(propose), args )}});
+
+    return structures::result(true);
 }
 
 void eosio::monitor_api_plugin_impl::monitor_app() {
@@ -381,4 +445,25 @@ fc::string eosio::monitor_api_plugin_impl::is_valid_url(const fc::string &url) {
         }
     }
     return url;
+}
+
+bytes eosio::monitor_api_plugin_impl::variant_to_bin(const account_name &account, const action_name &action, const variant &action_args_var) {
+    static unordered_map<account_name, std::vector<char> > abi_cache;
+    auto it = abi_cache.find( account );
+    if ( it == abi_cache.end() ) {
+       const auto result = call(is_valid_url("http://127.0.01:8888"), get_raw_code_and_abi_func, fc::mutable_variant_object("account_name", account));
+       std::tie( it, std::ignore ) = abi_cache.emplace( account, result["abi"].as_blob().data );
+       //we also received result["wasm"], but we don't use it
+    }
+    const std::vector<char>& abi_v = it->second;
+
+    abi_def abi;
+    if( abi_serializer::to_abi(abi_v, abi) ) {
+       abi_serializer abis( abi, fc::seconds(10) );
+       auto action_type = abis.get_action_type(action);
+       FC_ASSERT(!action_type.empty(), "Unknown action ${action} in contract ${contract}", ("action", action)("contract", account));
+       return abis.variant_to_binary(action_type, action_args_var, fc::seconds(10));
+    } else {
+       FC_ASSERT(false, "No ABI found for ${contract}", ("contract", account));
+    }
 }

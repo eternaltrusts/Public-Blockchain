@@ -7,6 +7,7 @@
 
 #include <fc/variant.hpp>
 #include <fc/io/json.hpp>
+#include <fc/network/url.hpp>
 
 namespace eosio {
 using namespace eosio::chain;
@@ -17,6 +18,7 @@ public:
     monitor_api_plugin_impl();
 
     eosio::structures::result push_action(const structures::transaction_hl &trx_hl);
+    eosio::structures::result push_multisig_action();
 
     void monitor_app();
 
@@ -51,10 +53,13 @@ private:
     void print_action_tree(const fc::variant& action);
     void print_result(const fc::variant& result);
 
-    structures::result send_actions(const string &url, std::vector<chain::action>&& actions, int32_t extra_kcpu = 1000, packed_transaction::compression_type compression = packed_transaction::none);
-    void send_transaction(const string &url, signed_transaction& trx, int32_t extra_kcpu, packed_transaction::compression_type compression = packed_transaction::none);
+    structures::result send_actions(const string &url, std::vector<chain::action>&& actions, int32_t extra_kcpu = 1000,
+                                    packed_transaction::compression_type compression = packed_transaction::none);
+    void send_transaction(const string &url, signed_transaction& trx, int32_t extra_kcpu,
+                          packed_transaction::compression_type compression = packed_transaction::none);
 
-    chain::action create_action(const string &url, const vector<permission_level>& authorization, const account_name& code, const action_name& act, const fc::variant& args);
+    chain::action create_action(const string &url, const vector<permission_level>& authorization, const account_name& code,
+                                const action_name& act, const fc::variant& args);
 
     fc::variant json_from_file_or_string(const string& file_or_str, fc::json::parse_type ptype = fc::json::legacy_parser);
 
@@ -62,9 +67,9 @@ private:
     authority parse_json_authority_or_key(const std::string& authorityJsonOrFile);
 
     string is_valid_url(const string &url);
-
-
     optional<signature_type> try_sign_digest(const digest_type digest, const public_key_type public_key);
+
+    bytes variant_to_bin(const account_name& account, const action_name& action, const fc::variant& action_args_var);
 
 private:
     eosio::client::http::http_context _context;
