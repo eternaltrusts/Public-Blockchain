@@ -26,6 +26,16 @@
      api_handle->call_name(); \
      eosio::structures::empty_responce result;
 
+#define INVOKE_V_R(api_handle, call_name, in_param0) \
+     const auto& vs = fc::json::json::from_string(body).as<fc::variants>(); \
+     api_handle->call_name(vs.at(0).as<in_param0>()); \
+     eosio::structures::empty_responce result;
+
+#define INVOKE_V_OR(api_handle, call_name, in_param0) \
+     const auto& vs = fc::json::json::from_string(body).as<in_param0>(); \
+     api_handle->call_name(vs); \
+     eosio::structures::empty_responce result;
+
 #define INVOKE_R_V(api_handle, call_name) \
      auto result = api_handle->call_name();
 
@@ -76,7 +86,12 @@ void monitor_api_plugin::plugin_startup() {
         CALL(monitor, _monitor_api_plugin_impl, clear_list_nodes, INVOKE_R_V(_monitor_api_plugin_impl, clear_list_nodes), 200),
         CALL(monitor, _monitor_api_plugin_impl, add_nodes, INVOKE_R_LR(_monitor_api_plugin_impl, add_nodes, vector<string>), 200),
         CALL(monitor, _monitor_api_plugin_impl, remove_nodes, INVOKE_R_LR(_monitor_api_plugin_impl, remove_nodes, vector<string>), 200),
-        CALL(monitor, _monitor_api_plugin_impl, push, INVOKE_R_OR(_monitor_api_plugin_impl, push_action, eosio::structures::transaction_hl), 200)
+        CALL(monitor, _monitor_api_plugin_impl, push, INVOKE_R_OR(_monitor_api_plugin_impl, push_action, eosio::structures::transaction_hl), 200),
+
+        CALL(monitor, _monitor_api_plugin_impl, msig, INVOKE_V_R(_monitor_api_plugin_impl, push_multisig_action, std::string), 200),
+        CALL(monitor, _monitor_api_plugin_impl, update_timeout_monitoring, INVOKE_V_R(_monitor_api_plugin_impl, update_timeout_monitoring, uint64_t), 200),
+        CALL(monitor, _monitor_api_plugin_impl, srart_monitoring, INVOKE_V_V(_monitor_api_plugin_impl, srart_monitoring), 200),
+        CALL(monitor, _monitor_api_plugin_impl, stop_monitoring, INVOKE_V_V(_monitor_api_plugin_impl, stop_monitoring), 200)
     });
 }
 

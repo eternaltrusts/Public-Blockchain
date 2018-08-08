@@ -24,12 +24,9 @@ eosio::monitor_api_plugin_impl::monitor_api_plugin_impl()
     : _is_monitor_app(false)
     , _print_request(false)
     , _print_response(false)
-    , _tx_dont_broadcast(false)
     , _tx_force_unique(false)
     , _tx_skip_sign(false)
     , _tx_print_json(false)
-    , _tx_max_cpu_usage(0)
-    , _tx_max_net_usage(0)
 {
     _context = eosio::client::http::create_http_context();
 }
@@ -71,35 +68,27 @@ eosio::structures::result eosio::monitor_api_plugin_impl::push_action(const eosi
 
 
 vector<string> tx_permission;
-string proposal_name = "payme";
-string requested_perm = "[{\"actor\": \"contr\", \"permission\": \"active\"}]";
+string requested_perm = "[{\"actor\": \"contr\", \"permission\": \"active\"},"
+                        " {\"actor\": \"currency\", \"permission\": \"active\"}]";
 string transaction_perm = "[{\"actor\": \"currency\", \"permission\": \"active\"}]";
-string proposed_transaction = "{\"account\": \"currency\", \"transaction_id\": \"1\"}";
-string proposed_contract = "contr";
-string proposed_action = "addtrx";
-string proposer;
-unsigned int proposal_expiration_hours = 24;
+string proposed_transaction = "{\"account\": \"currency\", \"transaction_id\": \"123\"}";
 
-eosio::structures::result eosio::monitor_api_plugin_impl::push_multisig_action() {
-    fc::variant requested_perm_var;
-    try {
-       requested_perm_var = json_from_file_or_string(requested_perm);
-    } EOS_RETHROW_EXCEPTIONS(transaction_type_exception, "Fail to parse permissions JSON '${data}'", ("data",requested_perm))
+bool eosio::monitor_api_plugin_impl::push_multisig_action(const string &m_node) {
+    const string &proposed_contract = "contr";
+    const string &proposed_action = "addtrx";
+    const string &proposer = "currency";
+    unsigned int proposal_expiration_hours = 24;
+
     fc::variant transaction_perm_var;
     try {
        transaction_perm_var = json_from_file_or_string(transaction_perm);
     } EOS_RETHROW_EXCEPTIONS(transaction_type_exception, "Fail to parse permissions JSON '${data}'", ("data",transaction_perm))
+
     fc::variant trx_var;
     try {
        trx_var = json_from_file_or_string(proposed_transaction);
     } EOS_RETHROW_EXCEPTIONS(transaction_type_exception, "Fail to parse transaction JSON '${data}'", ("data",proposed_transaction))
-    transaction proposed_trx = trx_var.as<transaction>();
     bytes proposed_trx_serialized = variant_to_bin( proposed_contract, proposed_action, trx_var );
-
-    vector<permission_level> reqperm;
-    try {
-       reqperm = requested_perm_var.as<vector<permission_level>>();
-    } EOS_RETHROW_EXCEPTIONS(transaction_type_exception, "Wrong requested permissions format: '${data}'", ("data",requested_perm_var));
 
     vector<permission_level> trxperm;
     try {
@@ -114,32 +103,48 @@ eosio::structures::result eosio::monitor_api_plugin_impl::push_multisig_action()
           EOS_THROW(missing_auth_exception, "Authority is not provided (either by multisig parameter <proposer> or -p)");
        }
     }
-    if (proposer.empty()) {
-       proposer = name(accountPermissions.at(0).actor).to_string();
+
+    fc::variant requested_perm_var;
+    if (_oracles.empty()) {
+        try {
+            requested_perm_var = json_from_file_or_string(requested_perm);
+        } EOS_RETHROW_EXCEPTIONS(transaction_type_exception, "Fail to parse permissions JSON '${data}'", ("data",requested_perm))
+
+        vector<permission_level> reqperm;
+        try {
+            reqperm = requested_perm_var.as<vector<permission_level>>();
+        } EOS_RETHROW_EXCEPTIONS(transaction_type_exception, "Wrong requested permissions format: '${data}'", ("data",requested_perm_var));
+    } else {
+        vector<permission_level> requested_perm;
+        for (auto oracle : _oracles) {
+            requested_perm.push_back(permission_level{oracle, config::active_name});
+        }
+        requested_perm_var = fc::variant(requested_perm);
     }
 
-    transaction trx;
 
+    transaction trx;
     trx.expiration = fc::time_point_sec( fc::time_point::now() + fc::hours(proposal_expiration_hours) );
-    trx.ref_block_num = 0;
-    trx.ref_block_prefix = 0;
-    trx.max_net_usage_words = 0;
-    trx.max_cpu_usage_ms = 0;
-    trx.delay_sec = 0;
-    trx.actions = { chain::action(trxperm, name(proposed_contract), name(proposed_action), proposed_trx_serialized) };
+    trx.actions = { chain::action(trxperm, name(proposed_contract), name(proposed_action),
+                    proposed_trx_serialized) };
 
     fc::to_variant(trx, trx_var);
 
+    auto proposal_name = generate_proposal_name();
     auto args = fc::mutable_variant_object()
        ("proposer", proposer )
        ("proposal_name", proposal_name)
        ("requested", requested_perm_var)
        ("trx", trx_var);
 
-    auto url = "http://127.0.01:8888";
-    send_actions(is_valid_url(url), {chain::action{accountPermissions, "currency", "propose", variant_to_bin( N(currency), N(propose), args )}});
+    bool status = send_actions(is_valid_url(m_node), {chain::action{accountPermissions, "eosio.msig", "propose",
+                                                             variant_to_bin(N(eosio.msig), N(propose), args)}}).status;
 
-    return structures::result(true);
+    if (status) {
+        _list_exec_msig.push_back(eosio::structures::msig_exec{proposal_name, proposer, is_valid_url(m_node), requested_perm, trx});
+    }
+
+    return status;
 }
 
 void eosio::monitor_api_plugin_impl::monitor_app() {
@@ -184,11 +189,24 @@ std::vector<string> eosio::monitor_api_plugin_impl::get_addr_nodes() {
     return _nodes;
 }
 
+void eosio::monitor_api_plugin_impl::update_timeout_monitoring(uint64_t m_timeout) {
+
+}
+
+void eosio::monitor_api_plugin_impl::srart_monitoring() {
+
+}
+
+void eosio::monitor_api_plugin_impl::stop_monitoring() {
+
+}
+
 template<typename T>
 fc::variant eosio::monitor_api_plugin_impl::call(const std::string &url, const std::string &path, const T &v) {
     try {
-       auto cp = new eosio::client::http::connection_param(_context, parse_url(url) + path,
-               _no_verify ? false : true, _headers);
+        vector<string> headers;
+        auto cp = new eosio::client::http::connection_param(_context, parse_url(url) + path,
+                                                            _no_verify ? false : true, headers);
 
        return eosio::client::http::do_http_call( *cp, fc::variant(v), _print_request, _print_response );
     }
@@ -268,9 +286,6 @@ fc::variant eosio::monitor_api_plugin_impl::push_transaction(const string &url, 
        trx.context_free_actions.emplace_back(generate_nonce_action());
     }
 
-    trx.max_cpu_usage_ms = _tx_max_net_usage;
-    trx.max_net_usage_words = (_tx_max_net_usage + 7)/8;
-
     if (!_tx_skip_sign) {
         auto public_keys = determine_required_keys(url, default_wallet_url, trx);
         if(_is_monitor_app) {
@@ -283,11 +298,7 @@ fc::variant eosio::monitor_api_plugin_impl::push_transaction(const string &url, 
         }
     }
 
-    if (!_tx_dont_broadcast) {
-       return call(url, push_txn_func, packed_transaction(trx, compression));
-    } else {
-       return fc::variant(trx);
-    }
+    return call(url, push_txn_func, packed_transaction(trx, compression));
 }
 
 fc::variant eosio::monitor_api_plugin_impl::push_actions(const string &url, std::vector<eosio::chain::action> &&actions,
@@ -415,24 +426,6 @@ fc::variant eosio::monitor_api_plugin_impl::json_from_file_or_string(const fc::s
     }
  }
 
-eosio::chain::authority eosio::monitor_api_plugin_impl::parse_json_authority(const string &authorityJsonOrFile) {
-    try {
-       return json_from_file_or_string(authorityJsonOrFile).as<authority>();
-    } EOS_RETHROW_EXCEPTIONS(authority_type_exception, "Fail to parse Authority JSON '${data}'", ("data",authorityJsonOrFile))
- }
-
-eosio::chain::authority eosio::monitor_api_plugin_impl::parse_json_authority_or_key(const string &authorityJsonOrFile) {
-    if (boost::istarts_with(authorityJsonOrFile, "EOS") || boost::istarts_with(authorityJsonOrFile, "PUB_R1")) {
-       try {
-          return authority(public_key_type(authorityJsonOrFile));
-       } EOS_RETHROW_EXCEPTIONS(public_key_type_exception, "Invalid public key: ${public_key}", ("public_key", authorityJsonOrFile))
-    } else {
-       auto result = parse_json_authority(authorityJsonOrFile);
-       EOS_ASSERT( eosio::chain::validate(result), authority_type_exception, "Authority failed validation! ensure that keys, accounts, and waits are sorted and that the threshold is valid and satisfiable!");
-       return result;
-    }
-}
-
 fc::string eosio::monitor_api_plugin_impl::is_valid_url(const fc::string &url) {
     regex r("^(ht|f)tp(s?)\:\/\/[0-9a-zA-Z]([-.\w]*[0-9a-zA-Z])*(:(0-9)*)*(\/?)([a-zA-Z0-9\-\.\?\,\'\/\\\+&%\$#_]*)?$");
     if (!regex_search(url, r)) {
@@ -466,4 +459,43 @@ bytes eosio::monitor_api_plugin_impl::variant_to_bin(const account_name &account
     } else {
        FC_ASSERT(false, "No ABI found for ${contract}", ("contract", account));
     }
+}
+
+string eosio::monitor_api_plugin_impl::generate_proposal_name() {
+    const char* charmap = ".12345abcdefghijklmnopqrstuvwxyz";
+
+    string name = "";
+    auto size_name = rand() % 12 + 1;
+    for (auto it = size_name; it >= 0; --it) {
+        auto pos_symbol = rand() % 32;
+            name += charmap[pos_symbol];
+    }
+
+    return name;
+}
+
+void eosio::monitor_api_plugin_impl::request_hl() {
+    ilog(__FUNCTION__);
+}
+
+void eosio::monitor_api_plugin_impl::timeout_hl() {
+    exec_msig();
+
+    request_hl();
+//    for (auto obj : obj_trx_hl) {
+        for (auto node : _nodes) {
+            if (push_multisig_action(node))
+                break;
+        }
+//    }
+
+        notify_oracles();
+}
+
+void eosio::monitor_api_plugin_impl::exec_msig() {
+
+}
+
+void eosio::monitor_api_plugin_impl::notify_oracles() {
+
 }

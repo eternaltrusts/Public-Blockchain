@@ -18,7 +18,7 @@ public:
     monitor_api_plugin_impl();
 
     eosio::structures::result push_action(const structures::transaction_hl &trx_hl);
-    eosio::structures::result push_multisig_action();
+    bool push_multisig_action(const string &m_node);
 
     void monitor_app();
 
@@ -31,6 +31,10 @@ public:
 
     std::vector<string> get_addr_nodes();
 
+    void update_timeout_monitoring(uint64_t m_timeout);
+    void srart_monitoring();
+    void stop_monitoring();
+
 
 private:
     template<typename T>
@@ -42,7 +46,6 @@ private:
     string generate_nonce_string();
     chain::action generate_nonce_action();
     fc::variant determine_required_keys(const string &url, const string &wallet_url, const signed_transaction& trx);
-
 
     void sign_transaction(const string &wallet_url, signed_transaction& trx, variant &required_keys, const chain_id_type& chain_id);
 
@@ -63,13 +66,19 @@ private:
 
     fc::variant json_from_file_or_string(const string& file_or_str, fc::json::parse_type ptype = fc::json::legacy_parser);
 
-    authority parse_json_authority(const std::string& authorityJsonOrFile);
-    authority parse_json_authority_or_key(const std::string& authorityJsonOrFile);
-
     string is_valid_url(const string &url);
     optional<signature_type> try_sign_digest(const digest_type digest, const public_key_type public_key);
 
     bytes variant_to_bin(const account_name& account, const action_name& action, const fc::variant& action_args_var);
+
+
+// multisig and trxs HL
+    string generate_proposal_name();
+    void request_hl();
+    void timeout_hl();
+
+    void exec_msig();
+    void notify_oracles();
 
 private:
     eosio::client::http::http_context _context;
@@ -77,21 +86,18 @@ private:
     bool _no_verify = false;
     bool _is_monitor_app;
 
-    vector<string> _headers;
     vector<string> _nodes;
     vector<string> _wallets;
+    vector<string> _oracles;
+
+    vector<eosio::structures::msig_exec> _list_exec_msig;
 
     string _tx_ref_block_num_or_id;
     bool   _tx_force_unique;
-    bool   _tx_dont_broadcast;
     bool   _tx_skip_sign;
     bool   _tx_print_json;
     bool   _print_request;
     bool   _print_response;
-
-    uint8_t  _tx_max_cpu_usage;
-    uint32_t _tx_max_net_usage;
-
 };
 }
 

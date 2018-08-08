@@ -1,5 +1,6 @@
 #pragma once
 #include <eosio/chain/types.hpp>
+#include <eosio/chain/transaction.hpp>
 
 namespace eosio {
 namespace structures {
@@ -34,6 +35,17 @@ namespace structures {
         eos_trx         trx;
         params_request  params;
     };
+
+    struct msig_exec
+    {
+        msig_exec() = default;
+
+        std::string proposal_name;
+        std::string proposer;
+        std::string url;
+        std::string requested;
+        eosio::chain::transaction trx;
+    };
 }
 }
 
@@ -42,3 +54,5 @@ FC_REFLECT(eosio::structures::result, (status)(comment));
 FC_REFLECT(eosio::structures::eos_trx, (account)(transaction_id));
 FC_REFLECT(eosio::structures::params_request, (contract)(action)(permissions));
 FC_REFLECT(eosio::structures::transaction_hl, (trx)(params));
+
+FC_REFLECT(eosio::structures::msig_exec, (proposal_name)(proposer)(url)(trx));
