@@ -45,6 +45,8 @@ namespace structures {
         std::string url;
         std::string requested;
         eosio::chain::transaction trx;
+
+        uint8_t counter;
     };
 }
 }
@@ -55,4 +57,4 @@ FC_REFLECT(eosio::structures::eos_trx, (account)(transaction_id));
 FC_REFLECT(eosio::structures::params_request, (contract)(action)(permissions));
 FC_REFLECT(eosio::structures::transaction_hl, (trx)(params));
 
-FC_REFLECT(eosio::structures::msig_exec, (proposal_name)(proposer)(url)(trx));
+FC_REFLECT(eosio::structures::msig_exec, (proposal_name)(proposer)(url)(trx)(counter));

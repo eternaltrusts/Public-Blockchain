@@ -9,6 +9,8 @@
 #include <fc/io/json.hpp>
 #include <fc/network/url.hpp>
 
+#include <queue>
+
 namespace eosio {
 using namespace eosio::chain;
 
@@ -73,24 +75,34 @@ private:
 
 
 // multisig and trxs HL
+    void start_timer();
+
     string generate_proposal_name();
-    void request_hl();
+    void request_list_trxs_hl();
     void timeout_hl();
 
-    void exec_msig();
+    void exec_msig_trxs();
     void notify_oracles();
+
+    bool exec_msig(structures::msig_exec &obj);
+    void test_aprove_contr(structures::msig_exec &obj);
+    void test_aprove_currency(structures::msig_exec &obj);
 
 private:
     eosio::client::http::http_context _context;
 
     bool _no_verify = false;
     bool _is_monitor_app;
+    bool _is_active_timer;
+
+    uint64_t _timeout;
+    boost::asio::high_resolution_timer _timer;
 
     vector<string> _nodes;
     vector<string> _wallets;
     vector<string> _oracles;
 
-    vector<eosio::structures::msig_exec> _list_exec_msig;
+    std::queue<eosio::structures::msig_exec> _queue_exec_msig;
 
     string _tx_ref_block_num_or_id;
     bool   _tx_force_unique;
