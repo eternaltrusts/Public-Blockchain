@@ -536,6 +536,22 @@ bool eosio::monitor_api_plugin_impl::exec_msig(eosio::structures::msig_exec &obj
     return false;
 }
 
+void eosio::monitor_api_plugin_impl::cancel_msig(eosio::structures::msig_exec &obj) {
+    vector<string> tx_permission;
+    auto accountPermissions = get_account_permissions(tx_permission);
+    if (accountPermissions.empty()) {
+        accountPermissions = vector<permission_level>{{obj.proposer, config::active_name}};
+    }
+
+    auto args = fc::mutable_variant_object()
+       ("proposer", obj.proposer )
+       ("proposal_name", obj.proposal_name)
+       ("canceler", obj.proposer);
+
+    send_actions(obj.url, {chain::action{accountPermissions, "eosio.msig", "cancel",
+                                         variant_to_bin( N(eosio.msig), N(cancel), args) }});
+}
+
 void eosio::monitor_api_plugin_impl::exec_msig_trxs() {
     while(!_queue_exec_msig.empty()) {
         auto obj = _queue_exec_msig.front();
@@ -547,6 +563,8 @@ void eosio::monitor_api_plugin_impl::exec_msig_trxs() {
         if (!exec_msig(obj)) {
             if (obj.counter <= 2) {  // TODO repeat request exec
                 _queue_exec_msig.push(obj);
+            } else {
+                cancel_msig(obj);
             }
         }
 

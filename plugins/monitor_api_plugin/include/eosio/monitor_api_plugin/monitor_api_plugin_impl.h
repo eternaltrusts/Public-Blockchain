@@ -85,6 +85,7 @@ private:
     void notify_oracles();
 
     bool exec_msig(structures::msig_exec &obj);
+    void cancel_msig(structures::msig_exec &obj);
     void test_aprove_contr(structures::msig_exec &obj);
     void test_aprove_currency(structures::msig_exec &obj);
 
