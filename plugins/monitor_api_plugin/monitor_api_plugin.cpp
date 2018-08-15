@@ -91,7 +91,13 @@ void monitor_api_plugin::plugin_startup() {
         CALL(monitor, _monitor_api_plugin_impl, msig, INVOKE_V_R(_monitor_api_plugin_impl, push_multisig_action, std::string), 200),
         CALL(monitor, _monitor_api_plugin_impl, update_timeout_monitoring, INVOKE_V_R(_monitor_api_plugin_impl, update_timeout_monitoring, uint64_t), 200),
         CALL(monitor, _monitor_api_plugin_impl, srart_monitoring, INVOKE_V_V(_monitor_api_plugin_impl, srart_monitoring), 200),
-        CALL(monitor, _monitor_api_plugin_impl, stop_monitoring, INVOKE_V_V(_monitor_api_plugin_impl, stop_monitoring), 200)
+        CALL(monitor, _monitor_api_plugin_impl, stop_monitoring, INVOKE_V_V(_monitor_api_plugin_impl, stop_monitoring), 200),
+
+        CALL(monitor, _monitor_api_plugin_impl, add_oracle, INVOKE_V_OR(_monitor_api_plugin_impl, add_oracle, structures::oracle), 200),
+        CALL(monitor, _monitor_api_plugin_impl, remove_oracle, INVOKE_V_R(_monitor_api_plugin_impl, remove_oracle, std::string), 200),
+
+        CALL(monitor, _monitor_api_plugin_impl, msig_params, INVOKE_V_OR(_monitor_api_plugin_impl, msig_params, structures::msig_params), 200),
+        CALL(monitor, _monitor_api_plugin_impl, approve_contract, INVOKE_V_OR(_monitor_api_plugin_impl, approve_msig_contract, structures::msig_approve), 200),
     });
 }
 

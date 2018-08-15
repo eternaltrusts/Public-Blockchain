@@ -17,7 +17,7 @@ namespace structures {
     };
 
     struct eos_trx {
-        eosio::chain::account_name account;
+        std::string account;
         std::string transaction_id;
 
         bool is_valid()const {
@@ -36,17 +36,42 @@ namespace structures {
         params_request  params;
     };
 
-    struct msig_exec
-    {
+    struct msig_approve {
+        msig_approve() = default;
+
+        std::string proposal_name;
+        std::string proposer;
+        std::string oracle;
+        std::string url;
+    };
+
+    struct msig_exec {
         msig_exec() = default;
 
         std::string proposal_name;
         std::string proposer;
         std::string url;
-        std::string requested;
+        fc::variant requested;
         eosio::chain::transaction trx;
 
         uint8_t counter;
+    };
+
+    struct msig_params {
+        msig_params() = default;
+
+        std::string proposed_contract;
+        std::string proposed_action;
+        std::string proposer;
+
+        unsigned int proposal_expiration_hours;
+    };
+
+    struct oracle {
+        oracle() = default;
+
+        std::string name;
+        std::string url;
     };
 }
 }
@@ -57,4 +82,8 @@ FC_REFLECT(eosio::structures::eos_trx, (account)(transaction_id));
 FC_REFLECT(eosio::structures::params_request, (contract)(action)(permissions));
 FC_REFLECT(eosio::structures::transaction_hl, (trx)(params));
 
+FC_REFLECT(eosio::structures::msig_approve, (proposal_name)(proposer)(oracle)(url));
 FC_REFLECT(eosio::structures::msig_exec, (proposal_name)(proposer)(url)(trx)(counter));
+FC_REFLECT(eosio::structures::msig_params, (proposed_contract)(proposed_action)(proposer)(proposal_expiration_hours));
+
+FC_REFLECT(eosio::structures::oracle, (name)(url));

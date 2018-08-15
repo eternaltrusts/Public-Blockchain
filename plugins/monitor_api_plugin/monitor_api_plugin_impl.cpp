@@ -71,38 +71,25 @@ eosio::structures::result eosio::monitor_api_plugin_impl::push_action(const eosi
 }
 
 
-string requested_perm = "[{\"actor\": \"contr\", \"permission\": \"active\"},"
-                        " {\"actor\": \"currency\", \"permission\": \"active\"}]";
-string transaction_perm = "[{\"actor\": \"currency\", \"permission\": \"active\"}]";
-string proposed_transaction = "{\"account\": \"currency\", \"transaction_id\": \"123\"}";
-
 bool eosio::monitor_api_plugin_impl::push_multisig_action(const string &m_node) {
-    const string &proposed_contract = "contr";
-    const string &proposed_action = "addtrx";
-    const string &proposer = "currency";
-    unsigned int proposal_expiration_hours = 24;
+//    structures::msig_params params{"contr", "addtrx", "currency", 24};
 
-    fc::variant transaction_perm_var;
-    try {
-       transaction_perm_var = json_from_file_or_string(transaction_perm);
-    } EOS_RETHROW_EXCEPTIONS(transaction_type_exception, "Fail to parse permissions JSON '${data}'", ("data",transaction_perm))
-
-    fc::variant trx_var;
-    try {
-       trx_var = json_from_file_or_string(proposed_transaction);
-    } EOS_RETHROW_EXCEPTIONS(transaction_type_exception, "Fail to parse transaction JSON '${data}'", ("data",proposed_transaction))
-    bytes proposed_trx_serialized = variant_to_bin( proposed_contract, proposed_action, trx_var );
+    auto proposal_name = generate_proposal_name();
+    fc::variant trx_var(structures::eos_trx{_msig_params.proposer, proposal_name});
+    bytes proposed_trx_serialized = variant_to_bin( _msig_params.proposed_contract, _msig_params.proposed_action, trx_var );
 
     vector<permission_level> trxperm;
+    fc::variant transaction_perm_var(vector<permission_level>{{_msig_params.proposer, config::active_name}});
     try {
        trxperm = transaction_perm_var.as<vector<permission_level>>();
-    } EOS_RETHROW_EXCEPTIONS(transaction_type_exception, "Wrong transaction permissions format: '${data}'", ("data",transaction_perm_var));
+    } EOS_RETHROW_EXCEPTIONS(transaction_type_exception, "Wrong transaction permissions format: '${data}'",
+                             ("data", transaction_perm_var));
 
     vector<string> tx_permission;
     auto accountPermissions = get_account_permissions(tx_permission);
     if (accountPermissions.empty()) {
-       if (!proposer.empty()) {
-          accountPermissions = vector<permission_level>{{proposer, config::active_name}};
+       if (!_msig_params.proposer.empty()) {
+          accountPermissions = vector<permission_level>{{_msig_params.proposer, config::active_name}};
        } else {
           EOS_THROW(missing_auth_exception, "Authority is not provided (either by multisig parameter <proposer> or -p)");
        }
@@ -111,32 +98,34 @@ bool eosio::monitor_api_plugin_impl::push_multisig_action(const string &m_node) 
     fc::variant requested_perm_var;
     if (_oracles.empty()) {
         try {
-            requested_perm_var = json_from_file_or_string(requested_perm);
-        } EOS_RETHROW_EXCEPTIONS(transaction_type_exception, "Fail to parse permissions JSON '${data}'", ("data",requested_perm))
+            requested_perm_var = json_from_file_or_string("[{\"actor\": \"contr\", \"permission\": \"active\"},"
+                                                          " {\"actor\": \"currency\", \"permission\": \"active\"}]");
+        } EOS_RETHROW_EXCEPTIONS(transaction_type_exception, "Fail to parse permissions JSON")
 
         vector<permission_level> reqperm;
         try {
             reqperm = requested_perm_var.as<vector<permission_level>>();
-        } EOS_RETHROW_EXCEPTIONS(transaction_type_exception, "Wrong requested permissions format: '${data}'", ("data",requested_perm_var));
+        } EOS_RETHROW_EXCEPTIONS(transaction_type_exception, "Wrong requested permissions format: '${data}'",
+                                 ("data",requested_perm_var));
     } else {
         vector<permission_level> requested_perm;
         for (auto oracle : _oracles) {
-            requested_perm.push_back(permission_level{oracle, config::active_name});
+            requested_perm.push_back(permission_level{oracle.name, config::active_name});
         }
         requested_perm_var = fc::variant(requested_perm);
     }
 
 
     transaction trx;
-    trx.expiration = fc::time_point_sec( fc::time_point::now() + fc::hours(proposal_expiration_hours) );
-    trx.actions = { chain::action(trxperm, name(proposed_contract), name(proposed_action),
+    trx.expiration = fc::time_point_sec( fc::time_point::now() + fc::hours(_msig_params.proposal_expiration_hours) );
+    trx.actions = { chain::action(trxperm, name(_msig_params.proposed_contract), name(_msig_params.proposed_action),
                     proposed_trx_serialized) };
 
     fc::to_variant(trx, trx_var);
 
-    auto proposal_name = generate_proposal_name();
+//    auto proposal_name = generate_proposal_name();
     auto args = fc::mutable_variant_object()
-       ("proposer", proposer )
+       ("proposer", _msig_params.proposer )
        ("proposal_name", proposal_name)
        ("requested", requested_perm_var)
        ("trx", trx_var);
@@ -145,7 +134,8 @@ bool eosio::monitor_api_plugin_impl::push_multisig_action(const string &m_node) 
         auto status_action = send_actions(is_valid_url(m_node), {chain::action{accountPermissions, "eosio.msig", "propose",
                                                                                variant_to_bin(N(eosio.msig), N(propose), args)}});
         if (status_action.status) {
-            _queue_exec_msig.push(eosio::structures::msig_exec{proposal_name, proposer, is_valid_url(m_node), requested_perm, trx, 0});
+            _queue_exec_msig.push(eosio::structures::msig_exec{proposal_name, _msig_params.proposer, is_valid_url(m_node),
+                                                               requested_perm_var, trx, 0});
         } else {
             ilog(proposal_name);
         }
@@ -154,7 +144,8 @@ bool eosio::monitor_api_plugin_impl::push_multisig_action(const string &m_node) 
 
     } catch (...) {
         ilog(proposal_name);
-        return false;
+        push_multisig_action(is_valid_url(m_node));
+//        return false;
     }
 }
 
@@ -210,6 +201,34 @@ void eosio::monitor_api_plugin_impl::srart_monitoring() {
 
 void eosio::monitor_api_plugin_impl::stop_monitoring() {
     _is_active_timer = false;
+}
+
+void eosio::monitor_api_plugin_impl::add_oracle(const eosio::structures::oracle &m_oracle) {
+    _oracles.push_back(m_oracle);
+}
+
+void eosio::monitor_api_plugin_impl::remove_oracle(const string &m_oracle_name) {
+
+}
+
+void eosio::monitor_api_plugin_impl::msig_params(const eosio::structures::msig_params &m_params) {
+    _msig_params = m_params;
+}
+
+void eosio::monitor_api_plugin_impl::approve_msig_contract(const structures::msig_approve &m_obj) {
+    auto args = fc::mutable_variant_object()
+       ("proposer", m_obj.proposer)
+       ("proposal_name", m_obj.proposal_name)
+       ("level", fc::variant(permission_level{name(m_obj.oracle), config::active_name}));
+
+
+    auto accountPermissions = vector<chain::permission_level>{{name(m_obj.oracle), config::active_name}};
+    try {
+        send_actions(m_obj.url, {chain::action{accountPermissions, "eosio.msig", "approve",
+                                             variant_to_bin( N(eosio.msig), N(approve), args ) }});
+    } catch(...) {
+        elog(__FUNCTION__);
+    }
 }
 
 template<typename T>
@@ -505,7 +524,7 @@ void eosio::monitor_api_plugin_impl::timeout_hl() {
 
     exec_msig_trxs();
 //    for (auto obj : request_list_trxs_hl()) {
-    for (auto i = 0; i < 100; ++i)
+    for (auto i = 0; i < 500; ++i)
         for (auto node : _nodes) {
             if (push_multisig_action(node))
                 break;
@@ -549,7 +568,7 @@ void eosio::monitor_api_plugin_impl::cancel_msig(eosio::structures::msig_exec &o
        ("canceler", obj.proposer);
 
     send_actions(obj.url, {chain::action{accountPermissions, "eosio.msig", "cancel",
-                                         variant_to_bin( N(eosio.msig), N(cancel), args) }});
+                                         variant_to_bin(N(eosio.msig), N(cancel), args)}});
 }
 
 void eosio::monitor_api_plugin_impl::exec_msig_trxs() {
@@ -567,8 +586,6 @@ void eosio::monitor_api_plugin_impl::exec_msig_trxs() {
                 cancel_msig(obj);
             }
         }
-
-        sleep(1); // TODO close last msig trx
     }
 }
 

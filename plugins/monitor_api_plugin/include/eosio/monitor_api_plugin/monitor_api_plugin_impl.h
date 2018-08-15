@@ -38,6 +38,12 @@ public:
     void stop_monitoring();
 
 
+    void add_oracle(const structures::oracle &m_oracle);
+    void remove_oracle(const std::string &m_oracle_name);
+
+    void msig_params(const structures::msig_params &m_params);
+    void approve_msig_contract(const structures::msig_approve &m_obj);
+
 private:
     template<typename T>
     fc::variant call(const std::string& url, const std::string& path, const T& v);
@@ -101,8 +107,9 @@ private:
 
     vector<string> _nodes;
     vector<string> _wallets;
-    vector<string> _oracles;
+    vector<structures::oracle> _oracles;
 
+    structures::msig_params _msig_params;
     std::queue<eosio::structures::msig_exec> _queue_exec_msig;
 
     string _tx_ref_block_num_or_id;
