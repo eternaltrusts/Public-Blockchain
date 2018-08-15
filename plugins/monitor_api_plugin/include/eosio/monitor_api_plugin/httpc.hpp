@@ -141,5 +141,21 @@ namespace eosio { namespace client { namespace http {
    const string wallet_sign_trx = wallet_func_base + "/sign_transaction";
    const string keosd_stop = "/v1/keosd/stop";
 
+
+   const string monitor_func_base = "/v1/monitor";
+   const string approve_msig = monitor_func_base + "/approve_contract";
+   const string list_nodes = monitor_func_base + "/list_nodes";
+   const string clear_list_nodes = monitor_func_base + "/clear_list_nodes";
+   const string add_nodes = monitor_func_base + "/add_nodes";
+   const string remove_nodes = monitor_func_base + "/remove_nodes";
+   const string push = monitor_func_base + "/push";
+   const string msig = monitor_func_base + "/msig";
+   const string update_timeout_monitoring = monitor_func_base + "/update_timeout_monitoring";
+   const string srart_monitoring = monitor_func_base + "/srart_monitoring";
+   const string stop_monitoring = monitor_func_base + "/stop_monitoring";
+   const string add_oracle = monitor_func_base + "/add_oracle";
+   const string remove_oracle = monitor_func_base + "/remove_oracle";
+   const string msig_params = monitor_func_base + "/msig_params";
+
    FC_DECLARE_EXCEPTION( connection_exception, 1100000, "Connection Exception" );
  }}}

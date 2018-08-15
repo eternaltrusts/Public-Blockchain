@@ -84,11 +84,12 @@ private:
     void start_timer();
 
     string generate_proposal_name();
+    vector<structures::oracle> generete_random_oracles();
     void request_list_trxs_hl();
     void timeout_hl();
 
     void exec_msig_trxs();
-    void notify_oracles();
+    void notify_oracles(const structures::oracle &m_oracle, const structures::msig_approve &m_approve);
 
     bool exec_msig(structures::msig_exec &obj);
     void cancel_msig(structures::msig_exec &obj);

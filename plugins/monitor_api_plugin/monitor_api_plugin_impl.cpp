@@ -72,8 +72,6 @@ eosio::structures::result eosio::monitor_api_plugin_impl::push_action(const eosi
 
 
 bool eosio::monitor_api_plugin_impl::push_multisig_action(const string &m_node) {
-//    structures::msig_params params{"contr", "addtrx", "currency", 24};
-
     auto proposal_name = generate_proposal_name();
     fc::variant trx_var(structures::eos_trx{_msig_params.proposer, proposal_name});
     bytes proposed_trx_serialized = variant_to_bin( _msig_params.proposed_contract, _msig_params.proposed_action, trx_var );
@@ -96,24 +94,13 @@ bool eosio::monitor_api_plugin_impl::push_multisig_action(const string &m_node) 
     }
 
     fc::variant requested_perm_var;
-    if (_oracles.empty()) {
-        try {
-            requested_perm_var = json_from_file_or_string("[{\"actor\": \"contr\", \"permission\": \"active\"},"
-                                                          " {\"actor\": \"currency\", \"permission\": \"active\"}]");
-        } EOS_RETHROW_EXCEPTIONS(transaction_type_exception, "Fail to parse permissions JSON")
-
-        vector<permission_level> reqperm;
-        try {
-            reqperm = requested_perm_var.as<vector<permission_level>>();
-        } EOS_RETHROW_EXCEPTIONS(transaction_type_exception, "Wrong requested permissions format: '${data}'",
-                                 ("data",requested_perm_var));
-    } else {
-        vector<permission_level> requested_perm;
-        for (auto oracle : _oracles) {
-            requested_perm.push_back(permission_level{oracle.name, config::active_name});
-        }
-        requested_perm_var = fc::variant(requested_perm);
+    vector<permission_level> requested_perm;
+    vector<pair<structures::oracle, structures::msig_approve>> oracles;
+    for (auto oracle : generete_random_oracles()) {
+        requested_perm.push_back(permission_level{oracle.name, config::active_name});
+        oracles.push_back({oracle, {proposal_name, _msig_params.proposer, oracle.name, m_node}});
     }
+    requested_perm_var = fc::variant(requested_perm);
 
 
     transaction trx;
@@ -123,7 +110,6 @@ bool eosio::monitor_api_plugin_impl::push_multisig_action(const string &m_node) 
 
     fc::to_variant(trx, trx_var);
 
-//    auto proposal_name = generate_proposal_name();
     auto args = fc::mutable_variant_object()
        ("proposer", _msig_params.proposer )
        ("proposal_name", proposal_name)
@@ -135,17 +121,16 @@ bool eosio::monitor_api_plugin_impl::push_multisig_action(const string &m_node) 
                                                                                variant_to_bin(N(eosio.msig), N(propose), args)}});
         if (status_action.status) {
             _queue_exec_msig.push(eosio::structures::msig_exec{proposal_name, _msig_params.proposer, is_valid_url(m_node),
-                                                               requested_perm_var, trx, 0});
-        } else {
-            ilog(proposal_name);
+                                                                           requested_perm_var, trx, 0});
+            for (auto obj_pair : oracles)
+                notify_oracles(obj_pair.first, obj_pair.second);
         }
 
         return status_action.status;
 
     } catch (...) {
         ilog(proposal_name);
-        push_multisig_action(is_valid_url(m_node));
-//        return false;
+        return false;
     }
 }
 
@@ -514,6 +499,27 @@ string eosio::monitor_api_plugin_impl::generate_proposal_name() {
     return name;
 }
 
+vector<eosio::structures::oracle> eosio::monitor_api_plugin_impl::generete_random_oracles() {
+    if (_oracles.size() < 5)
+        EOS_THROW(abort_called, "Not oralces");
+
+    vector<structures::oracle> oracles;
+    while (oracles.size() < 5) {
+        auto pos = rand() % _oracles.size();
+        auto it_pos = std::find_if(oracles.begin(), oracles.end(), [&](const auto &obj){
+            if (obj.name == _oracles.at(pos).name)
+                return true;
+            return false;
+        });
+
+        if (it_pos != oracles.end())
+            continue;
+        oracles.push_back(_oracles.at(pos));
+    }
+
+    return oracles;
+}
+
 void eosio::monitor_api_plugin_impl::request_list_trxs_hl() {
     ilog(__FUNCTION__);
 }
@@ -524,14 +530,12 @@ void eosio::monitor_api_plugin_impl::timeout_hl() {
 
     exec_msig_trxs();
 //    for (auto obj : request_list_trxs_hl()) {
-    for (auto i = 0; i < 500; ++i)
+    for (auto i = 0; i < 50; ++i)
         for (auto node : _nodes) {
             if (push_multisig_action(node))
                 break;
         }
 //    }
-
-    notify_oracles();
 }
 
 bool eosio::monitor_api_plugin_impl::exec_msig(eosio::structures::msig_exec &obj) {
@@ -576,8 +580,8 @@ void eosio::monitor_api_plugin_impl::exec_msig_trxs() {
         auto obj = _queue_exec_msig.front();
         _queue_exec_msig.pop();
 
-        test_aprove_contr(obj);
-        test_aprove_currency(obj);
+//        test_aprove_contr(obj);
+//        test_aprove_currency(obj);
 
         if (!exec_msig(obj)) {
             if (obj.counter <= 2) {  // TODO repeat request exec
@@ -589,8 +593,13 @@ void eosio::monitor_api_plugin_impl::exec_msig_trxs() {
     }
 }
 
-void eosio::monitor_api_plugin_impl::notify_oracles() {
-    // TODO Notification oracles
+void eosio::monitor_api_plugin_impl::notify_oracles(const structures::oracle &m_oracle,
+                                                    const structures::msig_approve &m_approve) {
+    try {
+        call(m_oracle.url, approve_msig, m_approve);
+    } catch(...) {
+        elog("error oracle app");
+    }
 }
 
 void eosio::monitor_api_plugin_impl::test_aprove_contr(eosio::structures::msig_exec &obj) {
