@@ -24,7 +24,7 @@ eternaltrusts::eternaltrusts(account_name creator)
  * @param action
  */
 void eternaltrusts::apply(uint64_t /*code*/, uint64_t action) {
-    if (N(createtrx) == action)
+    if (N(addtrx) == action)
         hyperLedger_transaction_id(unpack_action_data<structures::struct_no_id_transaction>());
 }
 
@@ -33,6 +33,8 @@ void eternaltrusts::apply(uint64_t /*code*/, uint64_t action) {
  * @param m_transaction_id
  */
 void eternaltrusts::hyperLedger_transaction_id(const structures::struct_no_id_transaction &m_transaction_id) {
+    require_auth(m_transaction_id.account);
+
     _table_transactions.emplace(_self, [&](auto &item) {
         item = structures::struct_transaction(m_transaction_id, _table_transactions.available_primary_key());
     });
