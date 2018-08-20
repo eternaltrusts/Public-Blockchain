@@ -62,6 +62,7 @@ monitor_api_plugin::monitor_api_plugin()
 void monitor_api_plugin::set_program_options(options_description&, options_description& cfg) {
    cfg.add_options()
            ("addr_node", bpo::value< vector<string> >()->composing(), "Node(s) to enable, may be specified multiple times")
+           ("addr_node_hl", bpo::value< vector<string> >()->composing(), "Node(s)_hl to enable, may be specified multiple times")
            ("addr_wallet", bpo::value< vector<string> >()->composing(), "Wallet to enable")
            ;
 }
@@ -71,6 +72,10 @@ void monitor_api_plugin::plugin_initialize(const variables_map& options) {
    if(options.count("addr_node")) {
        auto nodes = options.at("addr_node").as<std::vector<std::string>>();
        _monitor_api_plugin_impl->set_list_nodes(nodes);
+   }
+   if(options.count("addr_node_hl")) {
+       auto nodes = options.at("addr_node_hl").as<std::vector<std::string>>();
+       _monitor_api_plugin_impl->set_list_nodes_hl(nodes);
    }
    if(options.count("addr_wallet")) {
        auto wallets = options.at("addr_wallet").as<std::vector<std::string>>();
@@ -86,9 +91,12 @@ void monitor_api_plugin::plugin_startup() {
         CALL(monitor, _monitor_api_plugin_impl, clear_list_nodes, INVOKE_R_V(_monitor_api_plugin_impl, clear_list_nodes), 200),
         CALL(monitor, _monitor_api_plugin_impl, add_nodes, INVOKE_R_LR(_monitor_api_plugin_impl, add_nodes, vector<string>), 200),
         CALL(monitor, _monitor_api_plugin_impl, remove_nodes, INVOKE_R_LR(_monitor_api_plugin_impl, remove_nodes, vector<string>), 200),
-        CALL(monitor, _monitor_api_plugin_impl, push, INVOKE_R_OR(_monitor_api_plugin_impl, push_action, eosio::structures::transaction_hl), 200),
 
-        CALL(monitor, _monitor_api_plugin_impl, msig, INVOKE_V_R(_monitor_api_plugin_impl, push_multisig_action, std::string), 200),
+        CALL(monitor, _monitor_api_plugin_impl, list_nodes_hl, INVOKE_R_V(_monitor_api_plugin_impl, get_addr_nodes_hl), 200),
+        CALL(monitor, _monitor_api_plugin_impl, clear_list_nodes_hl, INVOKE_R_V(_monitor_api_plugin_impl, clear_list_nodes_hl), 200),
+        CALL(monitor, _monitor_api_plugin_impl, add_nodes_hl, INVOKE_R_LR(_monitor_api_plugin_impl, add_nodes_hl, vector<string>), 200),
+        CALL(monitor, _monitor_api_plugin_impl, remove_nodes_hl, INVOKE_R_LR(_monitor_api_plugin_impl, remove_nodes_hl, vector<string>), 200),
+
         CALL(monitor, _monitor_api_plugin_impl, update_timeout_monitoring, INVOKE_V_R(_monitor_api_plugin_impl, update_timeout_monitoring, uint64_t), 200),
         CALL(monitor, _monitor_api_plugin_impl, srart_monitoring, INVOKE_V_V(_monitor_api_plugin_impl, srart_monitoring), 200),
         CALL(monitor, _monitor_api_plugin_impl, stop_monitoring, INVOKE_V_V(_monitor_api_plugin_impl, stop_monitoring), 200),

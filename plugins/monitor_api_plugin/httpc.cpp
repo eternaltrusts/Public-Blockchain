@@ -265,4 +265,83 @@ namespace eosio { namespace client { namespace http {
    EOS_ASSERT( status_code == 200, http_request_fail, "Error code ${c}\n: ${msg}\n", ("c", status_code)("msg", re) );
    return response_result;
    }
+
+   fc::variant get_request(const connection_param& cp,
+                           const std::map<std::string, std::string> &tagrets,
+                           bool print_request,
+                           bool print_response) {
+
+       // TODO create titles
+       std::string str_target = request_hl;
+       for (const pair<std::string, std::string> &target : tagrets) {
+           const std::string &template_str = target.first + "=" + target.second;
+           str_target += template_str;
+       }
+
+       const auto& url = cp.url;
+
+       boost::asio::streambuf request;
+       std::ostream request_stream(&request);
+       auto host_header_value = format_host_header(url);
+       request_stream << "GET " << str_target << " HTTP/1.0\r\n";
+       request_stream << "Host: " << host_header_value << "\r\n";
+       request_stream << "Accept: */*\r\n";
+       request_stream << "Connection: close\r\n";
+       request_stream << "\r\n";
+
+       if ( print_request ) {
+           string s(request.size(), '\0');
+           buffer_copy(boost::asio::buffer(s), request.data());
+           std::cerr << "REQUEST:" << std::endl
+                     << "---------------------" << std::endl
+                     << s << std::endl
+                     << "---------------------" << std::endl;
+       }
+
+       unsigned int status_code;
+       std::string re;
+
+       try {
+           if(url.scheme == "http") {
+               tcp::socket socket(cp.context->ios);
+               do_connect(socket, url);
+               re = do_txrx(socket, request, status_code);
+           } else {
+
+           }
+       } catch ( invalid_http_request& e ) {
+           e.append_log( FC_LOG_MESSAGE( info, "Please verify this url is valid: ${url}", ("url", url.scheme + "://" + url.server + ":" + url.port + url.path) ) );
+           e.append_log( FC_LOG_MESSAGE( info, "If the condition persists, please contact the RPC server administrator for ${server}!", ("server", url.server) ) );
+           throw;
+       }
+
+       const auto response_result = fc::json::from_string(re);
+       if( print_response ) {
+          std::cerr << "RESPONSE:" << std::endl
+                    << "---------------------" << std::endl
+                    << fc::json::to_pretty_string( response_result ) << std::endl
+                    << "---------------------" << std::endl;
+       }
+       if( status_code == 200 || status_code == 201 || status_code == 202 ) {
+          return response_result;
+       } else if( status_code == 404 ) {
+          // Unknown endpoint
+
+       } else {
+          auto &&error_info = response_result.as<eosio::error_results>().error;
+          // Construct fc exception from error
+          const auto &error_details = error_info.details;
+
+          fc::log_messages logs;
+          for (auto itr = error_details.begin(); itr != error_details.end(); itr++) {
+             const auto& context = fc::log_context(fc::log_level::error, itr->file.data(), itr->line_number, itr->method.data());
+             logs.emplace_back(fc::log_message(context, itr->message));
+          }
+
+          throw fc::exception(logs, error_info.code, error_info.name, error_info.what);
+       }
+
+       EOS_ASSERT( status_code == 200, http_request_fail, "Error code ${c}\n: ${msg}\n", ("c", status_code)("msg", re) );
+       return response_result;
+   }
 }}}

@@ -10,6 +10,9 @@
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/classification.hpp>
 
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/date_time/posix_time/posix_time_io.hpp>
+
 #include <eosio/wallet_plugin/wallet_plugin.hpp>
 #include <eosio/wallet_plugin/wallet_manager.hpp>
 
@@ -30,6 +33,7 @@ eosio::monitor_api_plugin_impl::monitor_api_plugin_impl()
     , _is_active_timer(false)
     , _timeout(1)
     , _timer(app().get_io_service())
+    , _last_date_update(boost::posix_time::to_iso_extended_string(boost::posix_time::second_clock::local_time() - boost::posix_time::hours(24)))
 {
     _context = eosio::client::http::create_http_context();
     start_timer();
@@ -70,10 +74,9 @@ eosio::structures::result eosio::monitor_api_plugin_impl::push_action(const eosi
     return eosio::structures::result(false, "Requests have not passed");
 }
 
-
-bool eosio::monitor_api_plugin_impl::push_multisig_action(const string &m_node) {
+bool eosio::monitor_api_plugin_impl::push_multisig_action(const string &m_node, const structures::hl_obj &hl_obj) {
     auto proposal_name = generate_proposal_name();
-    fc::variant trx_var(structures::eos_trx{_msig_params.proposer, proposal_name});
+    fc::variant trx_var(structures::eos_trx{_msig_params.proposer, hl_obj.transactionId});
     bytes proposed_trx_serialized = variant_to_bin( _msig_params.proposed_contract, _msig_params.proposed_action, trx_var );
 
     vector<permission_level> trxperm;
@@ -143,6 +146,11 @@ void eosio::monitor_api_plugin_impl::set_list_nodes(const vector<fc::string> &no
         _nodes.push_back(is_valid_url(node));
 }
 
+void eosio::monitor_api_plugin_impl::set_list_nodes_hl(const vector<string> &nodes) {
+    for (auto node : nodes)
+        _nodes_hl.push_back(is_valid_url(node));
+}
+
 void eosio::monitor_api_plugin_impl::set_list_wallets(const vector<string> &wallets) {
     _wallets = wallets;
 }
@@ -172,12 +180,43 @@ eosio::structures::result eosio::monitor_api_plugin_impl::remove_nodes(const vec
     return eosio::structures::result(true);
 }
 
+eosio::structures::result eosio::monitor_api_plugin_impl::clear_list_nodes_hl() {
+    _nodes_hl.clear();
+    return eosio::structures::result(true);
+}
+
+eosio::structures::result eosio::monitor_api_plugin_impl::add_nodes_hl(const vector<string> &nodes) {
+    for (auto node : nodes) {
+        auto it = std::find(_nodes_hl.begin(), _nodes_hl.end(), is_valid_url(node));
+        if (it == _nodes_hl.end())
+            _nodes_hl.push_back(is_valid_url(node));
+    }
+
+    return eosio::structures::result(true);
+}
+
+eosio::structures::result eosio::monitor_api_plugin_impl::remove_nodes_hl(const vector<string> &nodes) {
+    for (auto node : nodes) {
+        auto it = std::find(_nodes_hl.begin(), _nodes_hl.end(), is_valid_url(node));
+        if (it != _nodes_hl.end())
+            _nodes_hl.erase(it);
+    }
+
+    return eosio::structures::result(true);
+}
+
 std::vector<string> eosio::monitor_api_plugin_impl::get_addr_nodes() {
     return _nodes;
 }
 
+std::vector<string> eosio::monitor_api_plugin_impl::get_addr_nodes_hl() {
+    return _nodes_hl;
+}
+
 void eosio::monitor_api_plugin_impl::update_timeout_monitoring(uint64_t m_timeout) {
+    _timer.cancel();
     _timeout = m_timeout;
+    start_timer();
 }
 
 void eosio::monitor_api_plugin_impl::srart_monitoring() {
@@ -288,13 +327,14 @@ fc::variant eosio::monitor_api_plugin_impl::push_transaction(const string &url, 
 
     // Set tapos, default to last irreversible block if it's not specified by the user
     block_id_type ref_block_id = info.last_irreversible_block_id;
+    string tx_ref_block_num_or_id;
     try {
        fc::variant ref_block;
-       if (!_tx_ref_block_num_or_id.empty()) {
-          ref_block = call(url, get_block_func, fc::mutable_variant_object("block_num_or_id", _tx_ref_block_num_or_id));
+       if (!tx_ref_block_num_or_id.empty()) {
+          ref_block = call(url, get_block_func, fc::mutable_variant_object("block_num_or_id", tx_ref_block_num_or_id));
           ref_block_id = ref_block["id"].as<block_id_type>();
        }
-    } EOS_RETHROW_EXCEPTIONS(invalid_ref_block_exception, "Invalid reference block num or id: ${block_num_or_id}", ("block_num_or_id", _tx_ref_block_num_or_id));
+    } EOS_RETHROW_EXCEPTIONS(invalid_ref_block_exception, "Invalid reference block num or id: ${block_num_or_id}", ("block_num_or_id", tx_ref_block_num_or_id));
     trx.set_reference_block(ref_block_id);
 
     if (_tx_force_unique) {
@@ -455,6 +495,11 @@ fc::string eosio::monitor_api_plugin_impl::is_valid_url(const fc::string &url) {
     return url;
 }
 
+std::string eosio::monitor_api_plugin_impl::is_valid_timestamp(const string &timestamp) {
+    std::string new_timestamp(timestamp);
+    return new_timestamp.erase(new_timestamp.find('Z'), 1);
+}
+
 bytes eosio::monitor_api_plugin_impl::variant_to_bin(const account_name &account, const action_name &action, const variant &action_args_var) {
     static unordered_map<account_name, std::vector<char> > abi_cache;
     auto it = abi_cache.find( account );
@@ -520,8 +565,17 @@ vector<eosio::structures::oracle> eosio::monitor_api_plugin_impl::generete_rando
     return oracles;
 }
 
-void eosio::monitor_api_plugin_impl::request_list_trxs_hl() {
-    ilog(__FUNCTION__);
+fc::variant eosio::monitor_api_plugin_impl::request_list_trxs_hl() {
+    for (auto node_hl : _nodes_hl) {
+        try {
+            vector<string> headers;
+            auto cp = new eosio::client::http::connection_param(_context, parse_url(node_hl), _no_verify ? false : true, headers);
+            return eosio::client::http::get_request( *cp, {{"startDate",_last_date_update}}, _print_request, _print_response );
+        }
+        catch(boost::system::system_error& e) {
+            elog(e.what());
+        }
+    }
 }
 
 void eosio::monitor_api_plugin_impl::timeout_hl() {
@@ -529,13 +583,20 @@ void eosio::monitor_api_plugin_impl::timeout_hl() {
         return;
 
     exec_msig_trxs();
-//    for (auto obj : request_list_trxs_hl()) {
-    for (auto i = 0; i < 50; ++i)
+
+    for (auto obj : request_list_trxs_hl().as<std::vector<structures::hl_obj>>()) {
+        boost::posix_time::ptime obj_time = boost::posix_time::from_iso_extended_string(is_valid_timestamp(obj.timestamp));
+        boost::posix_time::ptime last_update = boost::posix_time::from_iso_extended_string(_last_date_update);
+
+        if (obj_time > last_update) {
+            _last_date_update = boost::posix_time::to_iso_extended_string(obj_time + boost::posix_time::milliseconds(1));
+        }
+
         for (auto node : _nodes) {
-            if (push_multisig_action(node))
+            if (push_multisig_action(node, obj))
                 break;
         }
-//    }
+    }
 }
 
 bool eosio::monitor_api_plugin_impl::exec_msig(eosio::structures::msig_exec &obj) {

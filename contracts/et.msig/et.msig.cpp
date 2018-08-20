@@ -16,6 +16,9 @@ void multisig::propose( account_name proposer,
                         transaction  trx)
 */
 
+const int COUNT_ORACLES = 5;
+const int CONSENSUS_ORACLES_APPROVE = 3;
+
 void multisig::propose() {
     constexpr size_t max_stack_buffer_size = 512;
     size_t size = action_data_size();
@@ -30,7 +33,7 @@ void multisig::propose() {
     datastream<const char*> ds( buffer, size );
     ds >> proposer >> proposal_name >> requested;
 
-    eosio_assert(requested.size() == 5, "There are not enough oracles to confirm the transaction");
+    eosio_assert(requested.size() == COUNT_ORACLES, "There are not enough oracles to confirm the transaction");
 
     size_t trx_pos = ds.tellp();
     ds >> trx_header;
@@ -118,12 +121,7 @@ void multisig::exec( account_name proposer, name proposal_name, account_name exe
     auto& apps = apptable.get( proposal_name, "proposal not found" );
 
     vector<permission_level> list_approvals(apps.provided_approvals);
-//    if (list_approvals.size() < 3) {
-//        SEND_INLINE_ACTION(*this, cancel, {executer, N(active)}, {proposer, proposal_name, executer});
-//        return;
-//    }
-
-    eosio_assert(ist_approvals.size() >= 3, "There is no consensus");
+    eosio_assert(list_approvals.size() >= CONSENSUS_ORACLES_APPROVE, "There is no consensus");
 
     list_approvals.insert(list_approvals.end(), apps.requested_approvals.begin(), apps.requested_approvals.end());
 

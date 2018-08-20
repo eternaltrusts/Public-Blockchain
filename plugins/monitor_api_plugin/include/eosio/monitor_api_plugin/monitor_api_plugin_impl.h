@@ -20,18 +20,24 @@ public:
     monitor_api_plugin_impl();
 
     eosio::structures::result push_action(const structures::transaction_hl &trx_hl);
-    bool push_multisig_action(const string &m_node);
+    bool push_multisig_action(const string &m_node, const structures::hl_obj &hl_obj);
 
     void monitor_app();
 
     void set_list_nodes(const vector<string> &nodes);
+    void set_list_nodes_hl(const vector<string> &nodes);
     void set_list_wallets(const vector<string> &wallets);
 
     eosio::structures::result clear_list_nodes();
     eosio::structures::result add_nodes(const vector<string> &nodes);
     eosio::structures::result remove_nodes(const vector<string> &nodes);
 
+    eosio::structures::result clear_list_nodes_hl();
+    eosio::structures::result add_nodes_hl(const vector<string> &nodes);
+    eosio::structures::result remove_nodes_hl(const vector<string> &nodes);
+
     std::vector<string> get_addr_nodes();
+    std::vector<string> get_addr_nodes_hl();
 
     void update_timeout_monitoring(uint64_t m_timeout);
     void srart_monitoring();
@@ -75,6 +81,8 @@ private:
     fc::variant json_from_file_or_string(const string& file_or_str, fc::json::parse_type ptype = fc::json::legacy_parser);
 
     string is_valid_url(const string &url);
+    std::string is_valid_timestamp(const string &timestamp);
+
     optional<signature_type> try_sign_digest(const digest_type digest, const public_key_type public_key);
 
     bytes variant_to_bin(const account_name& account, const action_name& action, const fc::variant& action_args_var);
@@ -85,7 +93,7 @@ private:
 
     string generate_proposal_name();
     vector<structures::oracle> generete_random_oracles();
-    void request_list_trxs_hl();
+    fc::variant request_list_trxs_hl();
     void timeout_hl();
 
     void exec_msig_trxs();
@@ -93,6 +101,8 @@ private:
 
     bool exec_msig(structures::msig_exec &obj);
     void cancel_msig(structures::msig_exec &obj);
+
+
     void test_aprove_contr(structures::msig_exec &obj);
     void test_aprove_currency(structures::msig_exec &obj);
 
@@ -108,12 +118,14 @@ private:
 
     vector<string> _nodes;
     vector<string> _wallets;
+    vector<string> _nodes_hl;
     vector<structures::oracle> _oracles;
+
+    string _last_date_update;
 
     structures::msig_params _msig_params;
     std::queue<eosio::structures::msig_exec> _queue_exec_msig;
 
-    string _tx_ref_block_num_or_id;
     bool   _tx_force_unique;
     bool   _tx_skip_sign;
     bool   _tx_print_json;

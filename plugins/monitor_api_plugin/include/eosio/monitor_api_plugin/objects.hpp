@@ -73,6 +73,16 @@ namespace structures {
         std::string name;
         std::string url;
     };
+
+    struct hl_obj {
+        hl_obj() = default;
+
+        std::string $class;
+        std::string asset;
+        std::string newValue;
+        std::string transactionId;
+        std::string timestamp;
+    };
 }
 }
 
@@ -87,3 +97,4 @@ FC_REFLECT(eosio::structures::msig_exec, (proposal_name)(proposer)(url)(trx)(cou
 FC_REFLECT(eosio::structures::msig_params, (proposed_contract)(proposed_action)(proposer)(proposal_expiration_hours));
 
 FC_REFLECT(eosio::structures::oracle, (name)(url));
+FC_REFLECT(eosio::structures::hl_obj, ($class)(asset)(newValue)(transactionId)(timestamp));
