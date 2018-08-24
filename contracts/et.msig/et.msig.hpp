@@ -8,7 +8,7 @@ namespace eosio {
       public:
          multisig( account_name self ):contract(self){}
 
-         void propose();
+         void propose( account_name proposer, name proposal_name, vector<permission_level> requested, std::string  trx_hl );
          void approve( account_name proposer, name proposal_name, permission_level level );
          void unapprove( account_name proposer, name proposal_name, permission_level level );
          void cancel( account_name proposer, name proposal_name, account_name canceler );
@@ -17,7 +17,7 @@ namespace eosio {
       private:
          struct proposal {
             name                       proposal_name;
-            vector<char>               packed_transaction;
+            std::string                packed_transaction;
 
             auto primary_key()const { return proposal_name.value; }
          };

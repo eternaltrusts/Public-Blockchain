@@ -1,60 +1,27 @@
 #include "et.msig.hpp"
 #include <eosiolib/action.hpp>
-#include <eosiolib/permission.hpp>
+#include <eosiolib/transaction.hpp>
+
+#include "eternaltrusts/objects.hpp"
 
 namespace eosio {
-
-/*
-propose function manually parses input data (instead of taking parsed arguments from dispatcher)
-because parsing data in the dispatcher uses too much CPU in case if proposed transaction is big
-
-If we use dispatcher the function signature should be:
-
-void multisig::propose( account_name proposer,
-                        name proposal_name,
-                        vector<permission_level> requested,
-                        transaction  trx)
-*/
 
 const int COUNT_ORACLES = 5;
 const int CONSENSUS_ORACLES_APPROVE = 3;
 
-void multisig::propose() {
-    constexpr size_t max_stack_buffer_size = 512;
-    size_t size = action_data_size();
-    char* buffer = (char*)( max_stack_buffer_size < size ? malloc(size) : alloca(size) );
-    read_action_data( buffer, size );
-
-    account_name proposer;
-    name proposal_name;
-    vector<permission_level> requested;
-    transaction_header trx_header;
-
-    datastream<const char*> ds( buffer, size );
-    ds >> proposer >> proposal_name >> requested;
-
+void multisig::propose( account_name proposer,
+                        name proposal_name,
+                        vector<permission_level> requested,
+                        std::string  trx_hl) {
     eosio_assert(requested.size() == COUNT_ORACLES, "There are not enough oracles to confirm the transaction");
-
-    size_t trx_pos = ds.tellp();
-    ds >> trx_header;
-
     require_auth( proposer );
-    eosio_assert( trx_header.expiration >= eosio::time_point_sec(now()), "transaction expired" );
-    //eosio_assert( trx_header.actions.size() > 0, "transaction must have at least one action" );
 
     proposals proptable( _self, proposer );
     eosio_assert( proptable.find( proposal_name ) == proptable.end(), "proposal with the same name exists" );
 
-    bytes packed_requested = pack(requested);
-    auto res = ::check_transaction_authorization( buffer+trx_pos, size-trx_pos,
-                                                  (const char*)0, 0,
-                                                  packed_requested.data(), packed_requested.size()
-                                                  );
-    eosio_assert( res > 0, "transaction authorization failed" );
-
     proptable.emplace( proposer, [&]( auto& prop ) {
         prop.proposal_name       = proposal_name;
-        prop.packed_transaction  = bytes( buffer+trx_pos, buffer+size );
+        prop.packed_transaction  = trx_hl;
     });
 
     approvals apptable(  _self, proposer );
@@ -99,10 +66,7 @@ void multisig::cancel( account_name proposer, name proposal_name, account_name c
     proposals proptable( _self, proposer );
     auto& prop = proptable.get( proposal_name, "proposal not found" );
 
-    if( canceler != proposer ) {
-        eosio_assert( unpack<transaction_header>( prop.packed_transaction ).expiration < eosio::time_point_sec(now()),
-                      "cannot cancel until expiration" );
-    }
+    eosio_assert( canceler == proposer, "cannot cancel until expiration" );
 
     approvals apptable(  _self, proposer );
     auto& apps = apptable.get( proposal_name, "proposal not found" );
@@ -113,6 +77,7 @@ void multisig::cancel( account_name proposer, name proposal_name, account_name c
 
 void multisig::exec( account_name proposer, name proposal_name, account_name executer ) {
     require_auth( executer );
+    eosio_assert( proposer == executer, "Not permission exec" );
 
     proposals proptable( _self, proposer );
     auto& prop = proptable.get( proposal_name, "proposal not found" );
@@ -120,24 +85,13 @@ void multisig::exec( account_name proposer, name proposal_name, account_name exe
     approvals apptable(  _self, proposer );
     auto& apps = apptable.get( proposal_name, "proposal not found" );
 
-    vector<permission_level> list_approvals(apps.provided_approvals);
-    eosio_assert(list_approvals.size() >= CONSENSUS_ORACLES_APPROVE, "There is no consensus");
+    eosio_assert(apps.provided_approvals.size() >= CONSENSUS_ORACLES_APPROVE, "There is no consensus");
 
-    list_approvals.insert(list_approvals.end(), apps.requested_approvals.begin(), apps.requested_approvals.end());
 
-    transaction_header trx_header;
-    datastream<const char*> ds( prop.packed_transaction.data(), prop.packed_transaction.size() );
-    ds >> trx_header;
-    eosio_assert( trx_header.expiration >= eosio::time_point_sec(now()), "transaction expired" );
-
-    bytes packed_provided_approvals = pack(list_approvals);
-    auto res = ::check_transaction_authorization( prop.packed_transaction.data(), prop.packed_transaction.size(),
-                                                  (const char*)0, 0,
-                                                  packed_provided_approvals.data(), packed_provided_approvals.size()
-                                                  );
-    eosio_assert( res > 0, "transaction authorization failed" );
-
-    send_deferred( (uint128_t(proposer) << 64) | proposal_name, executer, prop.packed_transaction.data(), prop.packed_transaction.size() );
+    transaction trx;
+    trx.actions.push_back({permission_level(executer, N(active)), N(et.hl), N(addtrx),
+                           structures::struct_no_id_transaction{executer, prop.packed_transaction}});
+    trx.send(proposal_name, _self, true);
 
     proptable.erase(prop);
     apptable.erase(apps);
