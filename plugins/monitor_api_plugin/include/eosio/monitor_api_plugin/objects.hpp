@@ -51,8 +51,7 @@ namespace structures {
         std::string proposal_name;
         std::string proposer;
         std::string url;
-        fc::variant requested;
-        eosio::chain::transaction trx;
+        eosio::chain::action action;
 
         uint8_t counter;
     };
@@ -63,8 +62,7 @@ namespace structures {
         std::string proposed_contract;
         std::string proposed_action;
         std::string proposer;
-
-        unsigned int proposal_expiration_hours;
+        bool is_local;
     };
 
     struct oracle {
@@ -93,8 +91,8 @@ FC_REFLECT(eosio::structures::params_request, (contract)(action)(permissions));
 FC_REFLECT(eosio::structures::transaction_hl, (trx)(params));
 
 FC_REFLECT(eosio::structures::msig_approve, (proposal_name)(proposer)(oracle)(url));
-FC_REFLECT(eosio::structures::msig_exec, (proposal_name)(proposer)(url)(trx)(counter));
-FC_REFLECT(eosio::structures::msig_params, (proposed_contract)(proposed_action)(proposer)(proposal_expiration_hours));
+FC_REFLECT(eosio::structures::msig_exec, (proposal_name)(proposer)(url)(action)(counter));
+FC_REFLECT(eosio::structures::msig_params, (proposed_contract)(proposed_action)(proposer)(is_local));
 
 FC_REFLECT(eosio::structures::oracle, (name)(url));
 FC_REFLECT(eosio::structures::hl_obj, ($class)(asset)(newValue)(transactionId)(timestamp));

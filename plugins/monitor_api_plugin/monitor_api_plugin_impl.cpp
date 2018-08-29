@@ -33,7 +33,7 @@ eosio::monitor_api_plugin_impl::monitor_api_plugin_impl()
     , _is_active_timer(false)
     , _timeout(1)
     , _timer(app().get_io_service())
-    , _last_date_update(boost::posix_time::to_iso_extended_string(boost::posix_time::second_clock::local_time() - boost::posix_time::hours(24)))
+    , _last_date_update(boost::posix_time::to_iso_extended_string(boost::posix_time::second_clock::local_time() - boost::posix_time::hours(350)))
 {
     _context = eosio::client::http::create_http_context();
     start_timer();
@@ -52,12 +52,12 @@ eosio::structures::result eosio::monitor_api_plugin_impl::push_action(const eosi
             return eosio::structures::result(false, "field is empty transaction_id");
 
         fc::variant action_args_var;
-            try {
-                action_args_var = json_from_file_or_string(fc::json::to_string(data), fc::json::relaxed_parser);
-            } catch (...) {
-                const string &error_msg = "Fail to parse action JSON data='" + fc::json::to_string(data) + "'";
-                return eosio::structures::result(false, error_msg);
-            }
+        try {
+            action_args_var = json_from_file_or_string(fc::json::to_string(data), fc::json::relaxed_parser);
+        } catch (...) {
+            const string &error_msg = "Fail to parse action JSON data='" + fc::json::to_string(data) + "'";
+            return eosio::structures::result(false, error_msg);
+        }
 
         auto arg= fc::mutable_variant_object
                 ("code", params.contract)  // contract name
@@ -72,69 +72,6 @@ eosio::structures::result eosio::monitor_api_plugin_impl::push_action(const eosi
     }
 
     return eosio::structures::result(false, "Requests have not passed");
-}
-
-bool eosio::monitor_api_plugin_impl::push_multisig_action(const string &m_node, const structures::hl_obj &hl_obj) {
-    auto proposal_name = generate_proposal_name();
-    fc::variant trx_var(structures::eos_trx{_msig_params.proposer, hl_obj.transactionId});
-    bytes proposed_trx_serialized = variant_to_bin( _msig_params.proposed_contract, _msig_params.proposed_action, trx_var );
-
-    vector<permission_level> trxperm;
-    fc::variant transaction_perm_var(vector<permission_level>{{_msig_params.proposer, config::active_name}});
-    try {
-       trxperm = transaction_perm_var.as<vector<permission_level>>();
-    } EOS_RETHROW_EXCEPTIONS(transaction_type_exception, "Wrong transaction permissions format: '${data}'",
-                             ("data", transaction_perm_var));
-
-    vector<string> tx_permission;
-    auto accountPermissions = get_account_permissions(tx_permission);
-    if (accountPermissions.empty()) {
-       if (!_msig_params.proposer.empty()) {
-          accountPermissions = vector<permission_level>{{_msig_params.proposer, config::active_name}};
-       } else {
-          EOS_THROW(missing_auth_exception, "Authority is not provided (either by multisig parameter <proposer> or -p)");
-       }
-    }
-
-    fc::variant requested_perm_var;
-    vector<permission_level> requested_perm;
-    vector<pair<structures::oracle, structures::msig_approve>> oracles;
-    for (auto oracle : generete_random_oracles()) {
-        requested_perm.push_back(permission_level{oracle.name, config::active_name});
-        oracles.push_back({oracle, {proposal_name, _msig_params.proposer, oracle.name, m_node}});
-    }
-    requested_perm_var = fc::variant(requested_perm);
-
-
-    transaction trx;
-    trx.expiration = fc::time_point_sec( fc::time_point::now() + fc::hours(_msig_params.proposal_expiration_hours) );
-    trx.actions = { chain::action(trxperm, name(_msig_params.proposed_contract), name(_msig_params.proposed_action),
-                    proposed_trx_serialized) };
-
-    fc::to_variant(trx, trx_var);
-
-    auto args = fc::mutable_variant_object()
-       ("proposer", _msig_params.proposer )
-       ("proposal_name", proposal_name)
-       ("requested", requested_perm_var)
-       ("trx", trx_var);
-
-    try {
-        auto status_action = send_actions(is_valid_url(m_node), {chain::action{accountPermissions, "eosio.msig", "propose",
-                                                                               variant_to_bin(N(eosio.msig), N(propose), args)}});
-        if (status_action.status) {
-            _queue_exec_msig.push(eosio::structures::msig_exec{proposal_name, _msig_params.proposer, is_valid_url(m_node),
-                                                                           requested_perm_var, trx, 0});
-            for (auto obj_pair : oracles)
-                notify_oracles(obj_pair.first, obj_pair.second);
-        }
-
-        return status_action.status;
-
-    } catch (...) {
-        ilog(proposal_name);
-        return false;
-    }
 }
 
 void eosio::monitor_api_plugin_impl::monitor_app() {
@@ -239,19 +176,142 @@ void eosio::monitor_api_plugin_impl::msig_params(const eosio::structures::msig_p
     _msig_params = m_params;
 }
 
-void eosio::monitor_api_plugin_impl::approve_msig_contract(const structures::msig_approve &m_obj) {
-    auto args = fc::mutable_variant_object()
-       ("proposer", m_obj.proposer)
-       ("proposal_name", m_obj.proposal_name)
-       ("level", fc::variant(permission_level{name(m_obj.oracle), config::active_name}));
+bool eosio::monitor_api_plugin_impl::push_propose(const string &m_node, const eosio::structures::hl_obj &obj) {
+    try {
+        const auto &proposal_name = generate_proposal_name();
 
+        fc::variant requested_perm_var;
+        vector<permission_level> requested_perm;
+        vector<pair<structures::oracle, structures::msig_approve>> oracles;
+        for (auto oracle : generete_random_oracles(m_node)) {
+            requested_perm.push_back(permission_level{oracle.name, config::active_name});
+            oracles.push_back({oracle, {proposal_name, _msig_params.proposer, oracle.name, m_node}});
+        }
+        requested_perm_var = fc::variant(requested_perm);
+
+        vector<string> tx_permission;
+        auto accountPermissions = get_account_permissions(tx_permission);
+        if (accountPermissions.empty()) {
+            if (!_msig_params.proposer.empty()) {
+                accountPermissions = vector<permission_level>{{_msig_params.proposer, config::owner_name}};
+            } else EOS_THROW(missing_auth_exception, "Authority is not provided (either by multisig parameter <proposer> or -p)");
+        }
+
+        auto action_args_var = fc::mutable_variant_object()
+                ("proposer", _msig_params.proposer )
+                ("proposal_name", proposal_name)
+                ("requested", requested_perm_var)
+                ("trx", obj.transactionId);
+
+        auto args = fc::mutable_variant_object
+                ("code", "et.msig")    // contract name
+                ("action", "propose")  // action
+                ("args", action_args_var);
+
+        auto result = call(m_node, json_to_bin_func, args);
+        auto action_trx = chain::action{accountPermissions, N(et.msig), N(propose), result.get_object()["binargs"].as<bytes>()};
+
+        auto obj_result = send_actions(m_node, {action_trx});
+        if (obj_result.status) {
+            _queue_msig_params.push(eosio::structures::msig_exec{proposal_name, _msig_params.proposer, m_node, action_trx, 0});
+            for (auto obj_pair : oracles)
+                notify_oracles(obj_pair.first, obj_pair.second);
+
+            return true;
+        }
+
+        return false;
+    } catch(fc::exception &e) {
+        elog(e.to_detail_string());
+        if (e.code() == 3050003) {
+            push_propose(m_node, obj);
+        }
+
+        return false;
+    }
+}
+
+void eosio::monitor_api_plugin_impl::push_approve(const eosio::structures::msig_approve &m_obj) {
+    auto action_args_var = fc::mutable_variant_object()
+            ("proposer", m_obj.proposer)
+            ("proposal_name", m_obj.proposal_name)
+            ("level", fc::variant(permission_level{name(m_obj.oracle), config::active_name}));
+
+    auto args = fc::mutable_variant_object
+            ("code", "et.msig")  // contract name
+            ("action", "approve")  // action
+            ("args", action_args_var);
 
     auto accountPermissions = vector<chain::permission_level>{{name(m_obj.oracle), config::active_name}};
+
     try {
-        send_actions(m_obj.url, {chain::action{accountPermissions, "eosio.msig", "approve",
-                                             variant_to_bin( N(eosio.msig), N(approve), args ) }});
-    } catch(...) {
-        elog(__FUNCTION__);
+        auto result = call(m_obj.url, json_to_bin_func, args);
+        send_actions(m_obj.url, {chain::action{accountPermissions, "et.msig", "approve",
+                                               result.get_object()["binargs"].as<bytes>() }});
+    } catch(fc::exception &e) {
+        elog(e.to_detail_string());
+        elog("Сonfirmation error ${e}", ("e", name{m_obj.proposer}));
+    }
+}
+
+void eosio::monitor_api_plugin_impl::push_cancel(const structures::msig_exec &m_obj) {
+    vector<string> tx_permission;
+    auto accountPermissions = get_account_permissions(tx_permission);
+    if (accountPermissions.empty()) {
+        accountPermissions = vector<permission_level>{{m_obj.proposer, config::owner_name}};
+    }
+
+    auto action_args_var = fc::mutable_variant_object()
+            ("proposer", m_obj.proposer )
+            ("proposal_name", m_obj.proposal_name)
+            ("canceler", m_obj.proposer);
+
+    auto args = fc::mutable_variant_object
+            ("code", "et.msig")  // contract name
+            ("action", "cancel")  // action
+            ("args", action_args_var);
+    try {
+        auto result = call(m_obj.url, json_to_bin_func, args);
+        send_actions(m_obj.url, {chain::action{accountPermissions, "et.msig", "cancel",
+                                               result.get_object()["binargs"].as<bytes>() }});
+    } catch(fc::exception &e) {
+        elog(e.to_detail_string());
+        ilog("Error push cancel. Data: proposer: ${proposer}, proposal name: ${proposal_name}",
+             ("proposer", name{m_obj.proposer})("proposal_name", name{m_obj.proposal_name}) );
+    }
+}
+
+bool eosio::monitor_api_plugin_impl::push_exec(eosio::structures::msig_exec &obj) {
+    vector<string> tx_permission;
+    auto accountPermissions = get_account_permissions(tx_permission);
+    if (accountPermissions.empty()) {
+        accountPermissions = vector<permission_level>{{obj.proposer, config::owner_name}};
+    }
+
+    auto action_args_var = fc::mutable_variant_object()
+            ("proposer", obj.proposer )
+            ("proposal_name", obj.proposal_name)
+            ("executer", obj.proposer);
+
+    auto args = fc::mutable_variant_object
+            ("code", "et.msig")    // contract name
+            ("action", "exec")  // action
+            ("args", action_args_var);
+
+    try {
+        auto result = call(obj.url, json_to_bin_func, args);
+        auto obj_result = send_actions(obj.url, {chain::action{accountPermissions, N(et.msig), N(exec), result.get_object()["binargs"].as<bytes>()}});
+        if (obj_result.status)
+            return true;
+
+        ++obj.counter;
+        return false;
+    } catch(fc::exception &e) {
+        elog(e.to_detail_string());
+        ilog("Error push exec. Data: proposer: ${proposer}, proposal name: ${proposal_name}",
+             ("proposer", name{obj.proposer})("proposal_name", name{obj.proposal_name}) );
+        ++obj.counter;
+        return false;
     }
 }
 
@@ -287,10 +347,6 @@ vector<eosio::chain::permission_level> eosio::monitor_api_plugin_impl::get_accou
     vector<chain::permission_level> accountPermissions;
     boost::range::copy(fixedPermissions, back_inserter(accountPermissions));
     return accountPermissions;
-}
-
-string eosio::monitor_api_plugin_impl::generate_nonce_string() {
-    return fc::to_string(fc::time_point::now().time_since_epoch().count());
 }
 
 eosio::chain::action eosio::monitor_api_plugin_impl::generate_nonce_action() {
@@ -504,9 +560,14 @@ bytes eosio::monitor_api_plugin_impl::variant_to_bin(const account_name &account
     static unordered_map<account_name, std::vector<char> > abi_cache;
     auto it = abi_cache.find( account );
     if ( it == abi_cache.end() ) {
-       const auto result = call(is_valid_url("http://127.0.01:8888"), get_raw_code_and_abi_func, fc::mutable_variant_object("account_name", account));
-       std::tie( it, std::ignore ) = abi_cache.emplace( account, result["abi"].as_blob().data );
-       //we also received result["wasm"], but we don't use it
+        for (auto node : _nodes) {
+            try {
+                const auto result = call(is_valid_url(node), get_raw_code_and_abi_func, fc::mutable_variant_object("account_name", account));
+                std::tie( it, std::ignore ) = abi_cache.emplace( account, result["abi"].as_blob().data );
+            } catch(...){}
+        }
+
+        //we also received result["wasm"], but we don't use it
     }
     const std::vector<char>& abi_v = it->second;
 
@@ -544,23 +605,45 @@ string eosio::monitor_api_plugin_impl::generate_proposal_name() {
     return name;
 }
 
-vector<eosio::structures::oracle> eosio::monitor_api_plugin_impl::generete_random_oracles() {
-    if (_oracles.size() < 5)
-        EOS_THROW(abort_called, "Not oralces");
-
+vector<eosio::structures::oracle> eosio::monitor_api_plugin_impl::generete_random_oracles(const std::string &m_url) {
     vector<structures::oracle> oracles;
-    while (oracles.size() < 5) {
-        auto pos = rand() % _oracles.size();
-        auto it_pos = std::find_if(oracles.begin(), oracles.end(), [&](const auto &obj){
-            if (obj.name == _oracles.at(pos).name)
-                return true;
-            return false;
-        });
 
-        if (it_pos != oracles.end())
-            continue;
-        oracles.push_back(_oracles.at(pos));
+    if(_msig_params.is_local) {
+        if (_oracles.size() < 5)
+            EOS_THROW(abort_called, "Not oralces");
+        while (oracles.size() < 5) {
+            auto pos = rand() % _oracles.size();
+            auto it_pos = std::find_if(oracles.begin(), oracles.end(), [&](const auto &obj){
+                if (obj.name == _oracles.at(pos).name)
+                    return true;
+                return false;
+            });
+
+            if (it_pos != oracles.end())
+                continue;
+            oracles.push_back(_oracles.at(pos));
+        }
+    } else {
+        auto result = call(m_url, get_table_func, fc::mutable_variant_object("json", "true")
+                           ("code","et.token")
+                           ("scope","et.token")
+                           ("table","oracles")
+                           ("table_key","")
+                           ("lower_bound","")
+                           ("upper_bound","")
+                           ("limit","1000")
+                           ("key_type","")
+                           ("index_position", "")
+                           ("encode_type", "dec")
+                           );
+
+        if (result.is_object() && result.get_object().contains("rows")) {
+            oracles = result.get_object()["rows"].as<vector<structures::oracle>>();
+        }
     }
+
+    if (oracles.size() < 5)
+        EOS_THROW(abort_called, "Not list oralces");
 
     return oracles;
 }
@@ -593,62 +676,21 @@ void eosio::monitor_api_plugin_impl::timeout_hl() {
         }
 
         for (auto node : _nodes) {
-            if (push_multisig_action(node, obj))
+            if(push_propose(is_valid_url(node), obj))
                 break;
         }
     }
 }
 
-bool eosio::monitor_api_plugin_impl::exec_msig(eosio::structures::msig_exec &obj) {
-    vector<string> tx_permission;
-    auto accountPermissions = get_account_permissions(tx_permission);
-    if (accountPermissions.empty()) {
-        accountPermissions = vector<permission_level>{{obj.proposer, config::active_name}};
-    }
-
-    auto args = fc::mutable_variant_object()
-       ("proposer", obj.proposer )
-       ("proposal_name", obj.proposal_name)
-       ("executer", obj.proposer);
-
-    auto status_action = send_actions(obj.url, {chain::action{accountPermissions, "eosio.msig", "exec", variant_to_bin( N(eosio.msig), N(exec), args) }});
-    if (status_action.status) {
-        return true;
-    }
-
-    ++obj.counter;
-    return false;
-}
-
-void eosio::monitor_api_plugin_impl::cancel_msig(eosio::structures::msig_exec &obj) {
-    vector<string> tx_permission;
-    auto accountPermissions = get_account_permissions(tx_permission);
-    if (accountPermissions.empty()) {
-        accountPermissions = vector<permission_level>{{obj.proposer, config::active_name}};
-    }
-
-    auto args = fc::mutable_variant_object()
-       ("proposer", obj.proposer )
-       ("proposal_name", obj.proposal_name)
-       ("canceler", obj.proposer);
-
-    send_actions(obj.url, {chain::action{accountPermissions, "eosio.msig", "cancel",
-                                         variant_to_bin(N(eosio.msig), N(cancel), args)}});
-}
-
 void eosio::monitor_api_plugin_impl::exec_msig_trxs() {
-    while(!_queue_exec_msig.empty()) {
-        auto obj = _queue_exec_msig.front();
-        _queue_exec_msig.pop();
-
-//        test_aprove_contr(obj);
-//        test_aprove_currency(obj);
-
-        if (!exec_msig(obj)) {
+    while(!_queue_msig_params.empty()) {
+        auto obj = _queue_msig_params.front();
+        _queue_msig_params.pop();
+        if (!push_exec(obj)) {
             if (obj.counter <= 2) {  // TODO repeat request exec
-                _queue_exec_msig.push(obj);
+                _queue_msig_params.push(obj);
             } else {
-                cancel_msig(obj);
+                push_cancel(obj);
             }
         }
     }
@@ -661,33 +703,4 @@ void eosio::monitor_api_plugin_impl::notify_oracles(const structures::oracle &m_
     } catch(...) {
         elog("error oracle app");
     }
-}
-
-void eosio::monitor_api_plugin_impl::test_aprove_contr(eosio::structures::msig_exec &obj) {
-    fc::variant perm_var;
-    try {
-       perm_var = json_from_file_or_string("{\"actor\": \"currency\", \"permission\": \"active\"}");
-    } EOS_RETHROW_EXCEPTIONS(transaction_type_exception, "Fail to parse permissions JSON '${data}'", ("data","perm"))
-    auto args = fc::mutable_variant_object()
-       ("proposer", obj.proposer)
-       ("proposal_name", obj.proposal_name)
-       ("level", perm_var);
-
-    auto accountPermissions = vector<chain::permission_level>{{N(currency),config::active_name}};
-    send_actions(obj.url, {chain::action{accountPermissions, "eosio.msig", "approve", variant_to_bin( N(eosio.msig), N(approve), args ) }});
-}
-
-void eosio::monitor_api_plugin_impl::test_aprove_currency(eosio::structures::msig_exec &obj) {
-    fc::variant perm_var;
-    try {
-       perm_var = json_from_file_or_string("{\"actor\": \"contr\", \"permission\": \"active\"}");
-    } EOS_RETHROW_EXCEPTIONS(transaction_type_exception, "Fail to parse permissions JSON '${data}'", ("data","perm"))
-    auto args = fc::mutable_variant_object()
-       ("proposer", obj.proposer)
-       ("proposal_name", obj.proposal_name)
-       ("level", perm_var);
-
-    auto accountPermissions = vector<chain::permission_level>{{N(contr), config::active_name}};
-    send_actions(obj.url, {chain::action{accountPermissions, "eosio.msig", "approve",
-                                         variant_to_bin( N(eosio.msig), N(approve), args ) }});
 }

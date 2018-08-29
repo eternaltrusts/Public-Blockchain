@@ -19,8 +19,7 @@ class monitor_api_plugin_impl
 public:
     monitor_api_plugin_impl();
 
-    eosio::structures::result push_action(const structures::transaction_hl &trx_hl);
-    bool push_multisig_action(const string &m_node, const structures::hl_obj &hl_obj);
+    eosio::structures::result push_action(const eosio::structures::transaction_hl &trx_hl);
 
     void monitor_app();
 
@@ -48,7 +47,7 @@ public:
     void remove_oracle(const std::string &m_oracle_name);
 
     void msig_params(const structures::msig_params &m_params);
-    void approve_msig_contract(const structures::msig_approve &m_obj);
+    void push_approve(const structures::msig_approve &m_obj);
 
 private:
     template<typename T>
@@ -57,7 +56,7 @@ private:
 
     eosio::chain_apis::read_only::get_info_results get_info(const string &url);
     vector<chain::permission_level> get_account_permissions(const vector<string>& permissions);
-    string generate_nonce_string();
+
     chain::action generate_nonce_action();
     fc::variant determine_required_keys(const string &url, const string &wallet_url, const signed_transaction& trx);
 
@@ -70,13 +69,10 @@ private:
     void print_action_tree(const fc::variant& action);
     void print_result(const fc::variant& result);
 
-    structures::result send_actions(const string &url, std::vector<chain::action>&& actions, int32_t extra_kcpu = 1000,
-                                    packed_transaction::compression_type compression = packed_transaction::none);
-    void send_transaction(const string &url, signed_transaction& trx, int32_t extra_kcpu,
-                          packed_transaction::compression_type compression = packed_transaction::none);
+    structures::result send_actions(const string &url, std::vector<chain::action>&& actions, int32_t extra_kcpu = 1000, packed_transaction::compression_type compression = packed_transaction::none);
+    void send_transaction(const string &url, signed_transaction& trx, int32_t extra_kcpu, packed_transaction::compression_type compression = packed_transaction::none);
 
-    chain::action create_action(const string &url, const vector<permission_level>& authorization, const account_name& code,
-                                const action_name& act, const fc::variant& args);
+    chain::action create_action(const string &url, const vector<permission_level>& authorization, const account_name& code, const action_name& act, const fc::variant& args);
 
     fc::variant json_from_file_or_string(const string& file_or_str, fc::json::parse_type ptype = fc::json::legacy_parser);
 
@@ -92,19 +88,16 @@ private:
     void start_timer();
 
     string generate_proposal_name();
-    vector<structures::oracle> generete_random_oracles();
+    vector<structures::oracle> generete_random_oracles(const std::string &m_url);
     fc::variant request_list_trxs_hl();
     void timeout_hl();
 
     void exec_msig_trxs();
     void notify_oracles(const structures::oracle &m_oracle, const structures::msig_approve &m_approve);
 
-    bool exec_msig(structures::msig_exec &obj);
-    void cancel_msig(structures::msig_exec &obj);
-
-
-    void test_aprove_contr(structures::msig_exec &obj);
-    void test_aprove_currency(structures::msig_exec &obj);
+    bool push_propose(const string &m_node, const structures::hl_obj &obj);
+    void push_cancel(const structures::msig_exec &m_obj);
+    bool push_exec(structures::msig_exec &obj);
 
 private:
     eosio::client::http::http_context _context;
@@ -124,7 +117,7 @@ private:
     string _last_date_update;
 
     structures::msig_params _msig_params;
-    std::queue<eosio::structures::msig_exec> _queue_exec_msig;
+    std::queue<eosio::structures::msig_exec> _queue_msig_params;
 
     bool   _tx_force_unique;
     bool   _tx_skip_sign;

@@ -105,7 +105,7 @@ void monitor_api_plugin::plugin_startup() {
         CALL(monitor, _monitor_api_plugin_impl, remove_oracle, INVOKE_V_R(_monitor_api_plugin_impl, remove_oracle, std::string), 200),
 
         CALL(monitor, _monitor_api_plugin_impl, msig_params, INVOKE_V_OR(_monitor_api_plugin_impl, msig_params, structures::msig_params), 200),
-        CALL(monitor, _monitor_api_plugin_impl, approve_contract, INVOKE_V_OR(_monitor_api_plugin_impl, approve_msig_contract, structures::msig_approve), 200),
+        CALL(monitor, _monitor_api_plugin_impl, approve_contract, INVOKE_V_OR(_monitor_api_plugin_impl, push_approve, structures::msig_approve), 200),
     });
 }
 
