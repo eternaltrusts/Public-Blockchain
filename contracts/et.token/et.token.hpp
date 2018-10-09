@@ -6,11 +6,6 @@
 
 #include "objects.hpp"
 
-#include <eosiolib/asset.hpp>
-#include <eosiolib/eosio.hpp>
-
-#include <string>
-
 namespace eosiosystem {
    class system_contract;
 }
@@ -19,65 +14,58 @@ namespace eosio {
 
    using std::string;
 
-   class token : public contract {
+   class et_token : public contract {
       public:
-         token( account_name self );
+         et_token( account_name self ):contract(self){}
+         void apply(uint64_t code, uint64_t action);
 
+         inline asset get_supply( symbol_name sym )const;
+         inline asset get_balance( account_name owner, symbol_name sym )const;
+
+      private:
          void create( account_name issuer,
                       asset        maximum_supply);
 
-         void issue( account_name to,
-                     asset quantity,
-                     string memo );
+         void issue( account_name to, asset quantity, string memo );
+         void issue_by_token(account_name to, asset quantity, string memo );
+
+         void retire( asset quantity, string memo );
 
          void transfer( account_name from,
                         account_name to,
                         asset        quantity,
                         string       memo );
 
+         void open( account_name owner, symbol_type symbol, account_name payer );
 
-         void crtdirector(account_name account, account_name sender,
-                           std::string  url );
+         void close( account_name owner, symbol_type symbol );
 
-         void crtoracle(account_name account, account_name sender,
-                         std::string  url );
-      
-      
-         inline asset get_supply( symbol_name sym ) const;
-         inline asset get_balance( account_name owner, symbol_name sym ) const;
-         inline bool  is_active_oracle( account_name owner, symbol_name sym ) const;
+         void buy_token( account_name from,
+                         account_name to,
+                         asset        quantity,
+                         string       memo );
+
+         void freezing_tokens( account_name account,
+                               time_point_sec to_which = time_point_sec(now()) );
+         void defrost_tokens( account_name account);
 
       private:
          void sub_balance( account_name owner, asset value );
          void add_balance( account_name owner, asset value, account_name ram_payer );
 
-      private:
-         tables::dao_oracles _oracles;
-         tables::dao_dirctors _directors;
+         const asset convert_to_eternal_trusts_token( const asset &quantity )const;
    };
 
-   asset token::get_supply( symbol_name sym ) const
-   {
+   asset et_token::get_supply( symbol_name sym )const {
       tables::stats statstable( _self, sym );
       const auto& st = statstable.get( sym );
       return st.supply;
    }
 
-   asset token::get_balance( account_name owner, symbol_name sym ) const
-   {
+   asset et_token::get_balance( account_name owner, symbol_name sym )const {
       tables::accounts accountstable( _self, owner );
       const auto& ac = accountstable.get( sym );
       return ac.balance;
-   }
-
-   bool token::is_active_oracle( account_name owner, symbol_name sym ) const
-   {
-       tables::accounts accountstable( _self, owner );
-       const auto& account = accountstable.get( sym );
-       if ( account.balance >= TOKEN_PTT(10) )
-           return true;
-
-       return false;
    }
 
 } /// namespace eosio

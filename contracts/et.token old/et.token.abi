@@ -29,33 +29,10 @@
         {"name":"memo", "type":"string"}
      ]
   },{
-     "name": "retire",
-     "base": "",
-     "fields": [
-        {"name":"quantity", "type":"asset"},
-        {"name":"memo", "type":"string"}
-     ]
-  },{
-     "name": "open",
-     "base": "",
-     "fields": [
-        {"name":"owner", "type":"account_name"},
-        {"name":"symbol", "type":"symbol"},
-        {"name":"ram_payer", "type":"account_name"}
-     ]
-  },{
-     "name": "close",
-     "base": "",
-     "fields": [
-        {"name":"owner", "type":"account_name"},
-        {"name":"symbol", "type":"symbol"}
-     ]
-  },{
       "name": "account",
       "base": "",
       "fields": [
-        {"name":"balance", "type":"asset"},
-        {"name":"frozen_until", "type":"time_point_sec"}
+        {"name":"balance", "type":"asset"}
       ]
     },{
       "name": "currency_stats",
@@ -66,17 +43,12 @@
         {"name":"issuer", "type":"account_name"}
       ]
     },{
-      "name": "freezing_tokens",
+      "name": "account_args",
       "base": "",
       "fields": [
         {"name":"account", "type":"account_name"},
-        {"name":"to_which", "type":"time_point_sec"},
-      ]
-    },{
-      "name": "defrost_tokens",
-      "base": "",
-      "fields": [
-        {"name":"account", "type":"account_name"}
+        {"name":"sender", "type":"account_name"},
+        {"name":"url", "type":"string"}
       ]
     }
   ],
@@ -88,29 +60,17 @@
       "name": "issue",
       "type": "issue",
       "ricardian_contract": ""
-    },{
-      "name": "retire",
-      "type": "retire",
-      "ricardian_contract": ""
     }, {
       "name": "create",
       "type": "create",
       "ricardian_contract": ""
     }, {
-      "name": "open",
-      "type": "open",
+      "name": "crtdirector",
+      "type": "account_args",
       "ricardian_contract": ""
     }, {
-      "name": "close",
-      "type": "close",
-      "ricardian_contract": ""
-    }, {
-      "name": "frost",
-      "type": "freezing_tokens",
-      "ricardian_contract": ""
-    }, {
-      "name": "defrost",
-      "type": "defrost_tokens",
+      "name": "crtoracle",
+      "type": "account_args",
       "ricardian_contract": ""
     }
   ],
@@ -126,6 +86,18 @@
       "index_type": "i64",
       "key_names" : ["currency"],
       "key_types" : ["uint64"]
+    },{
+      "name": "oracles",
+      "type": "account_args",
+      "index_type": "i64",
+      "key_names" : ["account"],
+      "key_types" : ["account_name"]
+    },{
+      "name": "directors",
+      "type": "account_args",
+      "index_type": "i64",
+      "key_names" : ["account"],
+      "key_types" : ["account_name"]
     }
   ],
   "ricardian_clauses": [],
