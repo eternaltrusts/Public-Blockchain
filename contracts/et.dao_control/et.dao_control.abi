@@ -1,0 +1,62 @@
+{
+   "version": "eosio::abi/1.0",
+   "types": [{
+      "new_type_name": "account_name",
+      "type": "name"
+   }],
+  "structs": [{
+     "name": "create",
+     "base": "",
+     "fields": [
+        {"name":"account", "type":"account_name"}
+     ]
+  },{
+     "name": "create_oracle",
+     "base": "",
+     "fields": [
+        {"name":"account", "type":"account_name"},
+        {"name":"sender", "type":"account_name"},
+        {"name":"url", "type":"string"}
+     ]
+  },{
+    "name": "director",
+    "base": "",
+    "fields": [
+       {"name":"account", "type":"account_name"}
+    ]
+  },{
+    "name": "oracle",
+    "base": "",
+    "fields": [
+       {"name":"account", "type":"account_name"},
+       {"name":"url", "type":"string"}
+    ]
+  }
+  ],
+  "actions": [{
+      "name": "create",
+      "type": "create",
+      "ricardian_contract": ""
+    }, {
+      "name": "createoracle",
+      "type": "create_oracle",
+      "ricardian_contract": ""
+    }
+  ],
+  "tables": [{
+      "name": "directors",
+      "type": "director",
+      "index_type": "i64",
+      "key_names" : ["account"],
+      "key_types" : ["account_name"]
+    }, {
+    "name": "oracles",
+    "type": "oracle",
+    "index_type": "i64",
+    "key_names" : ["account"],
+    "key_types" : ["account_name"]
+  }
+  ],
+  "ricardian_clauses": [],
+  "abi_extensions": []
+}
