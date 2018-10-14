@@ -1,0 +1,97 @@
+{
+  "version": "eosio::abi/1.0",
+  "types": [{
+      "new_type_name": "account_name",
+      "type": "name"
+   },{
+      "new_type_name": "action_name",
+      "type": "name"
+  }],
+  "structs": [{
+      "name": "event_voting",
+      "base": "",
+      "fields": [
+        {"name": "contract", "type": "account_name"},
+        {"name": "action", "type": "action_name"},
+        {"name": "data", "type": "bytes"}
+      ]
+    },{
+      "name": "voting",
+      "base": "",
+      "fields": [
+         {"name": "id", "type": "uint64"},
+         {"name": "creator", "type": "account_name"},
+         {"name": "date_create", "type": "time_point_sec"},
+         {"name": "date_close", "type": "time_point_sec"},
+         {"name": "event", "type": "event_voting"},
+         {"name": "status", "type": "uint8"}
+      ]
+    },{
+      "name": "vote",
+      "base": "",
+      "fields": [
+        {"name":"id", "type":"uint64"},
+        {"name":"id_voting", "type":"uint64"},
+        {"name":"type", "type":"uint8"},
+        {"name":"account", "type":"account_name"}
+      ]
+    },{
+     "name": "oeration_vote",
+     "base": "",
+     "fields": [
+        {"name":"account", "type":"account_name"},
+        {"name":"id", "type":"uint64"}
+     ]
+    },{
+     "name": "user_voice",
+     "base": "",
+     "fields": [
+        {"name":"account", "type":"account_name"},
+        {"name":"id", "type":"uint8"}
+     ]
+    },{
+      "name": "create_voting",
+      "base": "",
+      "fields": [
+        {"name":"creator", "type":"account_name"},
+        {"name":"time_end", "type":"time_point_sec"},
+        {"name":"memo", "type":"string"},
+        {"name":"event", "type":"event_voting"}
+      ]
+    }
+  ],
+  "actions": [{
+      "name": "create",
+      "type": "propose",
+      "ricardian_contract": ""
+    },{
+      "name": "cancel",
+      "type": "approve",
+      "ricardian_contract": ""
+    },{
+      "name": "voice",
+      "type": "unapprove",
+      "ricardian_contract": ""
+    }, {
+      "name": "ahead",
+      "type": "cancel",
+      "ricardian_contract": ""
+    }
+  ],
+  "tables": [{
+      "name": "voting",
+      "type": "voting",
+      "index_type": "i64",
+      "key_names" : ["id"],
+      "key_types" : ["uint64"]
+    },{
+      "name": "votes",
+      "type": "vote",
+      "index_type": "i64",
+      "key_names" : ["id"],
+      "key_types" : ["uint64"]
+    }
+  ],
+  "ricardian_clauses": [],
+  "abi_extensions": []
+}
