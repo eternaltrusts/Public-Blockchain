@@ -20,9 +20,9 @@
       "base": "",
       "fields": [
          {"name": "id", "type": "uint64"},
-         {"name": "creator", "type": "account_name"},
          {"name": "date_create", "type": "time_point_sec"},
          {"name": "date_close", "type": "time_point_sec"},
+         {"name": "memo", "type": "string"},
          {"name": "event", "type": "event_voting"},
          {"name": "status", "type": "uint8"}
       ]

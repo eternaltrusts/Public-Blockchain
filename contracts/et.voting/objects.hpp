@@ -8,6 +8,12 @@ using namespace std;
 using namespace eosio;
 
 
+enum class status_voting {
+    open,
+    close,
+    ahead
+}
+
 namespace structures {
 
     struct event_voting {
@@ -23,10 +29,15 @@ namespace structures {
         account_name creator;
         time_point_sec date_create;
         time_point_sec date_close;
+        string memo;
         event_voting event;
         uint8_t status;
 
-        EOSLIB_SERIALIZE( voting, (id)(creator)(date_create)(date_close)(event)(status) )
+        auto primary_key() const {
+            return id;
+        }
+
+        EOSLIB_SERIALIZE( voting, (id)(creator)(date_create)(date_close)(memo)(event)(status) )
     };
 
     struct vote {
@@ -34,6 +45,10 @@ namespace structures {
         uint64_t id_voting;
         uint8_t type;
         account_name account;
+
+        auto primary_key() const {
+            return id;
+        }
 
         EOSLIB_SERIALIZE( vote, (id)(id_voting)(type)(account) )
     };
