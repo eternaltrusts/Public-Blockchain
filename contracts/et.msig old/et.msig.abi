@@ -18,21 +18,13 @@
         {"name": "permission", "type": "permission_name"}
       ]
     },{
-      "name": "transfer",
+      "name": "action",
       "base": "",
       "fields": [
-        {"name":"from", "type":"account_name"},
-        {"name":"to", "type":"account_name"},
-        {"name":"quantity", "type":"asset"},
-        {"name":"memo", "type":"string"}
-      ]
-    },{
-      "name": "transaction_object",
-      "base": "",
-      "fields": [
-         {"name": "contract", "type": "account_name"},
-         {"name": "action", "type": "action_name"},
-         {"name": "packed_transaction", "type": "transfer"}
+         {"name": "account", "type": "account_name"},
+         {"name": "name", "type": "action_name"},
+         {"name": "authorization", "type": "permission_level[]"},
+         {"name": "data", "type": "bytes"}
       ]
     },{
       "name": "propose",
@@ -40,15 +32,14 @@
       "fields": [
         {"name":"proposer", "type":"account_name"},
         {"name":"proposal_name", "type":"name"},
-        {"name":"mandatory_list", "type":"permission_level[]"},
-        {"name":"oracles", "type":"permission_level[]"},
-        {"name":"number_of_confirmations", "type":"uint8"},
-        {"name":"transaction_obj", "type":"transaction_object"}
+        {"name":"requested", "type":"permission_level[]"},
+        {"name":"trx", "type":"string"}
       ]
     },{
      "name": "approve",
      "base": "",
      "fields": [
+        {"name":"proposer", "type":"account_name"},
         {"name":"proposal_name", "type":"name"},
         {"name":"level", "type":"permission_level"}
      ]
@@ -56,6 +47,7 @@
      "name": "unapprove",
      "base": "",
      "fields": [
+        {"name":"proposer", "type":"account_name"},
         {"name":"proposal_name", "type":"name"},
         {"name":"level", "type":"permission_level"}
      ]
@@ -63,6 +55,7 @@
       "name": "cancel",
       "base": "",
       "fields": [
+        {"name":"proposer", "type":"account_name"},
         {"name":"proposal_name", "type":"name"},
         {"name":"canceler", "type":"account_name"}
       ]
@@ -70,6 +63,7 @@
       "name": "exec",
       "base": "",
       "fields": [
+        {"name":"proposer", "type":"account_name"},
         {"name":"proposal_name", "type":"name"},
         {"name":"executer", "type":"account_name"}
       ]
@@ -78,9 +72,7 @@
       "base": "",
       "fields": [
         {"name": "proposal_name", "type": "name"},
-        {"name": "proposer", "type": "account_name"},
-        {"name": "number_of_confirmations", "type": "uint8"},
-        {"name": "struct_transaction", "type": "transaction_object"}
+        {"name": "packed_transaction", "type": "string"}
       ]
     },{
       "name": "approvals_info",
@@ -88,9 +80,7 @@
       "fields": [
         {"name": "proposal_name", "type": "name"},
         {"name": "requested_approvals", "type": "permission_level[]"},
-        {"name": "provided_approvals", "type": "permission_level[]"},
-        {"name": "mandatory_requested_approvals", "type": "permission_level[]"},
-        {"name": "mandatory_provided_approvals", "type": "permission_level[]"}
+        {"name": "provided_approvals", "type": "permission_level[]"}
       ]
     }
   ],
@@ -115,6 +105,7 @@
       "type": "exec",
       "ricardian_contract": ""
     }
+
   ],
   "tables": [{
       "name": "proposal",
