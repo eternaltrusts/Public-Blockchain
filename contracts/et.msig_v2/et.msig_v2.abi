@@ -111,7 +111,7 @@
       "base": "",
       "fields": [
         {"name": "name", "type": "name"},
-        {"name": "symbol, "type": "symbol"}
+        {"name": "symbol", "type": "symbol"}
       ]
     },{
       "name": "hash_file",
