@@ -21,8 +21,10 @@ void multisig_output_limits::updhashfile(std::string hash) {
 
 void multisig_output_limits::crtlimits(account_name name, vector<multisig_output_limits::st_limit> vlimits) {
     require_auth(_self);
+    eosio_assert(vlimits.size(), "not elements in list");
 
-    limits limits_table(_self, _self);
+    auto symbol = vlimits.begin()->amount.symbol;
+    limits limits_table(_self, symbol.name());
     auto it_limits = limits_table.find(name);
     eosio_assert(it_limits == limits_table.end(), "This account limit exist");
 
@@ -34,8 +36,10 @@ void multisig_output_limits::crtlimits(account_name name, vector<multisig_output
 
 void multisig_output_limits::updlimits(account_name name, vector<multisig_output_limits::st_limit> vlimits) {
     require_auth(_self);
+    eosio_assert(vlimits.size(), "not elements in list");
 
-    limits limits_table(_self, _self);
+    auto symbol = vlimits.begin()->amount.symbol;
+    limits limits_table(_self, symbol.name());
     auto it_limits = limits_table.find(name);
     eosio_assert(it_limits != limits_table.end(), "Not found account in limits table");
 
@@ -44,10 +48,10 @@ void multisig_output_limits::updlimits(account_name name, vector<multisig_output
     });
 }
 
-void multisig_output_limits::dellimits(account_name name) {
+void multisig_output_limits::dellimits(account_name name, symbol_type symbol) {
     require_auth(_self);
 
-    limits limits_table(_self, _self);
+    limits limits_table(_self, symbol.name());
     auto it_limits = limits_table.find(name);
     eosio_assert(it_limits != limits_table.end(), "Not found account in limits table");
 
@@ -60,7 +64,8 @@ void multisig_output_limits::propose(account_name proposer, name proposal_name, 
     proposals proptable( _self, _self );
     eosio_assert( proptable.find( proposal_name ) == proptable.end(), "proposal with the same name exists" );
 
-    limits limits_table(_self, _self);
+    auto symbol = transaction_obj.packed_transaction.quantity.symbol;
+    limits limits_table(_self, symbol.name());
     auto it_limits = limits_table.find(proposer);   
     eosio_assert(it_limits != limits_table.end(), "Not found account");
 
@@ -164,6 +169,12 @@ void multisig_output_limits::exec(name proposal_name, account_name executer ) {
         proptable.erase(prop);
         apptable.erase(apps);
     }
+}
+
+template<typename test>
+void multisig_output_limits::tt(test &&l)
+{
+
 }
 
 } /// namespace eosio
