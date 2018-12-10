@@ -1,6 +1,7 @@
 #pragma once
 #include <eosiolib/eosio.hpp>
 #include <eosiolib/transaction.hpp>
+#include <eosiolib/singleton.hpp>
 
 #include <eosio.token/eosio.token.hpp>
 
@@ -37,8 +38,15 @@ namespace eosio {
       };
       typedef eosio::multi_index<N(approvals), approvals_info> approvals;
 
+      struct hash_file {
+          std::string hash;
+      };
+      typedef eosio::singleton<N(hashfile), hash_file> hash_table;
+
    public:
       multisig( account_name self ):contract(self){}
+      void addhashfile( std::string hash );
+      void updhashfile( std::string hash );
       void propose(account_name proposer, name proposal_name, vector<permission_level> mandatory_list, vector<permission_level> oracles,
                    uint8_t number_of_confirmations, transaction_object transaction_obj );
       void approve( name proposal_name, permission_level level );

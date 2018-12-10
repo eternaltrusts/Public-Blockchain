@@ -5,6 +5,20 @@
 
 namespace eosio {
 
+void multisig_output_limits::addhashfile(std::string hash) {
+    hash_table table(_self, _self);
+    eosio_assert(!table.exists(), "hash file exist");
+
+    table.set({hash}, _self);
+}
+
+void multisig_output_limits::updhashfile(std::string hash) {
+    hash_table table(_self, _self);
+    eosio_assert(table.exists(), "hash file not exist");
+
+    table.set({hash}, _self);
+}
+
 void multisig_output_limits::crtlimits(account_name name, vector<multisig_output_limits::st_limit> vlimits) {
     require_auth(_self);
 
@@ -154,4 +168,4 @@ void multisig_output_limits::exec(name proposal_name, account_name executer ) {
 
 } /// namespace eosio
 
-EOSIO_ABI( eosio::multisig_output_limits, (crtlimits)(updlimits)(dellimits)(propose)(approve)(unapprove)(cancel)(exec) )
+EOSIO_ABI( eosio::multisig_output_limits, (addhashfile)(updhashfile)(crtlimits)(updlimits)(dellimits)(propose)(approve)(unapprove)(cancel)(exec) )

@@ -1,8 +1,9 @@
 #pragma once
 #include <eosiolib/eosio.hpp>
 #include <eosiolib/transaction.hpp>
+#include <eosiolib/singleton.hpp>
 
-#include <eosio.token/eosio.token.hpp>
+#include "eosio.token/eosio.token.hpp"
 
 namespace eosio {
 
@@ -46,8 +47,15 @@ namespace eosio {
       };
       typedef eosio::multi_index<N(limits), limits_info> limits;
 
+      struct hash_file {
+          std::string hash;
+      };
+      typedef eosio::singleton<N(hashfile), hash_file> hash_table;
+
    public:
       multisig_output_limits( account_name self ):contract(self){}
+      void addhashfile( std::string hash );
+      void updhashfile( std::string hash );
       void crtlimits(account_name name, vector<st_limit> vlimits);
       void updlimits(account_name name, vector<st_limit> vlimits);
       void dellimits(account_name name);

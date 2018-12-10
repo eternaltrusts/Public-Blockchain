@@ -106,6 +106,12 @@
       "fields": [
         {"name": "name", "type": "name"}
       ]
+    },{
+      "name": "hash_file",
+      "base": "",
+      "fields": [
+        {"name": "hash", "type": "string"}
+      ]
     }
   ],
   "actions": [{
@@ -140,6 +146,14 @@
       "name": "exec",
       "type": "exec",
       "ricardian_contract": ""
+    }, {
+      "name": "addhashfile",
+      "type": "hash_file",
+      "ricardian_contract": ""
+    }, {
+      "name": "updhashfile",
+      "type": "hash_file",
+      "ricardian_contract": ""
     }
   ],
   "tables": [{
@@ -157,6 +171,12 @@
     },{
       "name": "limits",
       "type": "limits",
+      "index_type": "i64",
+      "key_names" : [],
+      "key_types" : []
+    },{
+      "name": "hashfile",
+      "type": "hash_file",
       "index_type": "i64",
       "key_names" : [],
       "key_types" : []
