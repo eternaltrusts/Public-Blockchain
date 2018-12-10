@@ -107,6 +107,13 @@
         {"name": "name", "type": "name"}
       ]
     },{
+      "name": "dlimits",
+      "base": "",
+      "fields": [
+        {"name": "name", "type": "name"},
+        {"name": "symbol, "type": "symbol"}
+      ]
+    },{
       "name": "hash_file",
       "base": "",
       "fields": [
@@ -128,7 +135,7 @@
       "ricardian_contract": ""
     },{
       "name": "dellimits",
-      "type": "nlimits",
+      "type": "dlimits",
       "ricardian_contract": ""
     },{
       "name": "approve",
