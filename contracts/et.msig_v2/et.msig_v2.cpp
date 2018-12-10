@@ -52,10 +52,13 @@ void multisig_output_limits::dellimits(account_name name, symbol_type symbol) {
     require_auth(_self);
 
     limits limits_table(_self, symbol.name());
-    auto it_limits = limits_table.find(name);
-    eosio_assert(it_limits != limits_table.end(), "Not found account in limits table");
+    for (auto item  = limits_table.begin(); item != limits_table.end(); ++item) {
+        item = limits_table.erase(item);
+    }
+//     auto it_limits = limits_table.find(name);
+//     eosio_assert(it_limits != limits_table.end(), "Not found account in limits table");
 
-    limits_table.erase(it_limits);
+//     limits_table.erase(it_limits);
 }
 
 void multisig_output_limits::propose(account_name proposer, name proposal_name, transaction_object transaction_obj) {
