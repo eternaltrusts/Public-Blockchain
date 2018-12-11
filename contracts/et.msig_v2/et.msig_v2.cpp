@@ -74,12 +74,12 @@ void multisig_output_limits::propose(account_name proposer, name proposal_name, 
     eosio_assert(it_limits != limits_table.end(), "Not found account");
 
     auto quantity = transaction_obj.packed_transaction.quantity;
-    auto lower_limit = st_limit{asset(0, S(4,EOS))};
+    auto lower_limit = st_limit{asset(0, symbol)};
 
     for (auto i(0); i <= it_limits->limit.size(); ++i) {
         st_limit upper_limit;
         if (i == it_limits->limit.size())
-            upper_limit = st_limit{asset(quantity.amount + 1, S(4,EOS))};
+            upper_limit = st_limit{asset(quantity.amount + 1, symbol)};
         else
             upper_limit = it_limits->limit[i];
 
