@@ -110,7 +110,6 @@
       "name": "dlimits",
       "base": "",
       "fields": [
-        {"name": "name", "type": "name"},
         {"name": "symbol", "type": "symbol"}
       ]
     },{

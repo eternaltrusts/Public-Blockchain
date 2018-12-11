@@ -58,14 +58,12 @@ namespace eosio {
       void updhashfile( std::string hash );
       void crtlimits(account_name name, vector<st_limit> vlimits);
       void updlimits(account_name name, vector<st_limit> vlimits);
-      void dellimits(account_name name, symbol_type symbol);
+      void dellimits(symbol_type symbol);
       void propose(account_name proposer, name proposal_name, transaction_object transaction_obj);
       void approve( name proposal_name, permission_level level );
       void unapprove( name proposal_name, permission_level level );
       void cancel( name proposal_name, account_name canceler );
       void exec( name proposal_name, account_name executer );
-
-      template <typename test> void tt(test && l);
    };
 
 } /// namespace eosio

@@ -48,17 +48,18 @@ void multisig_output_limits::updlimits(account_name name, vector<multisig_output
     });
 }
 
-void multisig_output_limits::dellimits(account_name name, symbol_type symbol) {
+void multisig_output_limits::dellimits(symbol_type symbol) {
     require_auth(_self);
 
     limits limits_table(_self, symbol.name());
-    for (auto item  = limits_table.begin(); item != limits_table.end(); ++item) {
+//    for (auto item  = limits_table.begin(); item != limits_table.end(); ++item) {
+//        item = limits_table.erase(item);
+//    }
+
+    auto item = limits_table.begin();
+    while ( item != limits_table.end() ) {
         item = limits_table.erase(item);
     }
-//     auto it_limits = limits_table.find(name);
-//     eosio_assert(it_limits != limits_table.end(), "Not found account in limits table");
-
-//     limits_table.erase(it_limits);
 }
 
 void multisig_output_limits::propose(account_name proposer, name proposal_name, transaction_object transaction_obj) {
