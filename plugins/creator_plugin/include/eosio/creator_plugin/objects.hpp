@@ -18,6 +18,12 @@ struct create_account {
     std::string account;
 };
 
+struct add_contract {
+    std::string account;
+    std::string password;
+    std::string type;
+};
+
 struct result_create_account {
     result_create_account(std::string m_account)
         : account(m_account), status(false){}
@@ -36,4 +42,5 @@ struct result_create_account {
 FC_REFLECT(structures::empty_responce,)
 FC_REFLECT(structures::result,(status)(comment))
 FC_REFLECT(structures::create_account,(account))
+FC_REFLECT(structures::add_contract,(account)(password)(type))
 FC_REFLECT(structures::result_create_account,(account)(password)(owner_private_key)(owner_public_key)(active_private_key)(active_public_key))

@@ -70,7 +70,8 @@ void creator_plugin::plugin_startup() {
     ilog("starting creator_plugin");
 
     app().get_plugin<http_plugin>().add_api({
-        CALL(creator, _creator_plugin_impl, create_account, INVOKE_R_OR(_creator_plugin_impl, create_account, structures::create_account), 200)
+        CALL(creator, _creator_plugin_impl, create_account, INVOKE_R_OR(_creator_plugin_impl, create_account, structures::create_account), 200),
+        CALL(creator, _creator_plugin_impl, deploy_contract, INVOKE_R_OR(_creator_plugin_impl, deploy_contract, structures::add_contract), 200),
     });
 }
 

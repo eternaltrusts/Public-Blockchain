@@ -22,13 +22,18 @@ public:
     void tester_app();
 
     structures::result_create_account create_account(const structures::create_account &name_accaunt);
-
+    structures::result deploy_contract(const structures::add_contract &params);
 
 private:
+    void unlock_creator();
     void create_wallet(structures::result_create_account &obj);
     void generate_key(structures::result_create_account &obj);
     void import_key(const structures::result_create_account &obj);
     void cretae_account_in_eosio(structures::result_create_account &obj);
+
+    void deploy_code(const std::string &account, const std::string &wasmPath, std::vector<action> &actions);
+    void deploy_abi(const std::string &account, const std::string &abiPath, std::vector<chain::action> &actions);
+    void update_permission(const std::string &saccount, std::vector<chain::action> &actions, public_key_type public_key);
 
 private:
     template<typename T>
@@ -72,6 +77,13 @@ private:
 
     chain::action create_buyram(const name& creator, const name& newaccount, const asset& quantity);
     chain::action create_delegate(const name& from, const name& receiver, const asset& net, const asset& cpu, bool transfer);
+
+    chain::action create_setabi(const name& account, const bytes& abi);
+    chain::action create_setcode(const name& account, const bytes& code);
+    chain::action create_updateauth(const name& account, const name& permission, const name& parent, const authority& auth);
+
+    authority parse_json_authority(const std::string& authorityJsonOrFile);
+    authority parse_json_authority_or_key(const std::string& authorityJsonOrFile);
 
 private:
     eosio::client::http::http_context _context;

@@ -16,14 +16,17 @@
 #include <eosio/wallet_plugin/wallet_plugin.hpp>
 #include <eosio/wallet_plugin/wallet_manager.hpp>
 
-
+#include <fc/io/fstream.hpp>
 
 using namespace std;
 using namespace eosio;
 using namespace eosio::client::http;
 
-const static eosio::account_name creator = N(etrusts12crt);
-const static std::string default_url = "http://dev.cryptolions.io:38888"; //"http://127.0.0.1:8888/";
+const static std::string path_contracts = "/build-eos/contracts/";
+const static std::string wallet_name = "kylin";
+const static std::string wallet_password = "PW5JMZiBAtwK27g1AnWNWwcqSUvxfMJisbM1svohSZ4FoLABzswy4";
+const static eosio::account_name creator = N(saniatestnet);
+const static std::string default_url = "http://kylin.fn.eosbixin.com";
 
 const static std::string default_wallet_url = "http://127.0.0.1:8900/";
 
@@ -48,6 +51,7 @@ structures::result_create_account eosio::creator_plugin_impl::create_account(con
         call(default_url, get_account_func, fc::mutable_variant_object("account_name", name_accaunt.account));
         return result;
     } catch (...) {
+        unlock_creator();
         generate_key(result);
         create_wallet(result);
         import_key(result);
@@ -58,9 +62,49 @@ structures::result_create_account eosio::creator_plugin_impl::create_account(con
     }
 }
 
+structures::result creator_plugin_impl::deploy_contract(const structures::add_contract &params) {
+    std::vector<chain::action> actions;
+
+    auto& wallet_mgr = app().get_plugin<wallet_plugin>().get_wallet_manager();
+    try {
+        wallet_mgr.unlock(params.account, params.password);
+    } catch(...) {}
+
+    auto keys = wallet_mgr.list_keys(params.account, params.password);
+
+    update_permission(params.account, actions, keys.rbegin()->first);
+
+    string abi, wasm;
+    if (params.type == "msig_v1") {
+        abi = path_contracts + "et.msig/et.msig.abi";
+        wasm = path_contracts +  "et.msig/et.msig.wasm";
+    } else if (params.type == "msig_v2") {
+        abi = path_contracts + "et.msig_v2/et.msig_v2.abi";
+        wasm = path_contracts + "et.msig_v2/et.msig_v2.wasm";
+    } else
+        return {false, "not valid type"};
+
+
+    deploy_abi(params.account, abi, actions);
+    deploy_code(params.account, wasm, actions);
+
+    if (actions.size())
+        send_actions(default_url, std::move(actions), 10000, packed_transaction::zlib);
+    wallet_mgr.lock_all();
+
+    return {true, "deploy sucscessful"};
+}
+
+void creator_plugin_impl::unlock_creator() {
+    try {
+        auto& wallet_mgr = app().get_plugin<wallet_plugin>().get_wallet_manager();
+        wallet_mgr.unlock(wallet_name, wallet_password);
+    } catch(...) {}
+}
+
 void eosio::creator_plugin_impl::create_wallet(structures::result_create_account &obj) {
-    const auto& v = call(default_wallet_url, wallet_create, obj.account);
-    obj.password = v.get_string();
+    auto& wallet_mgr = app().get_plugin<wallet_plugin>().get_wallet_manager();
+    obj.password = wallet_mgr.create(obj.account);
 }
 
 void eosio::creator_plugin_impl::generate_key(structures::result_create_account &obj) {
@@ -74,14 +118,17 @@ void eosio::creator_plugin_impl::generate_key(structures::result_create_account 
 }
 
 void eosio::creator_plugin_impl::import_key(const structures::result_create_account &obj) {
-    private_key_type owner_wallet_key = private_key_type( obj.owner_private_key );
-    private_key_type active_wallet_key = private_key_type( obj.active_private_key );
+//    private_key_type owner_wallet_key = private_key_type( obj.owner_private_key );
+//    private_key_type active_wallet_key = private_key_type( obj.active_private_key );
 
-    fc::variants vs_owner = {fc::variant(obj.account), fc::variant(owner_wallet_key)};
-    call(default_wallet_url, wallet_import_key, vs_owner); // TODO owner keys
+//    fc::variants vs_owner = {fc::variant(obj.account), fc::variant(owner_wallet_key)};
+//    call(default_wallet_url, wallet_import_key, vs_owner); // TODO owner keys
 
-    fc::variants vs_active = {fc::variant(obj.account), fc::variant(active_wallet_key)};
-    call(default_wallet_url, wallet_import_key, vs_active); // TODO active keys
+//    fc::variants vs_active = {fc::variant(obj.account), fc::variant(active_wallet_key)};
+//    call(default_wallet_url, wallet_import_key, vs_active); // TODO active keys
+    auto& wallet_mgr = app().get_plugin<wallet_plugin>().get_wallet_manager();
+    wallet_mgr.import_key(obj.account, obj.owner_private_key);
+    wallet_mgr.import_key(obj.account, obj.active_private_key);
 }
 
 void eosio::creator_plugin_impl::cretae_account_in_eosio(structures::result_create_account &obj) {
@@ -94,10 +141,10 @@ void eosio::creator_plugin_impl::cretae_account_in_eosio(structures::result_crea
     } EOS_RETHROW_EXCEPTIONS(public_key_type_exception, "Invalid active public key: ${public_key}", ("public_key", obj.active_public_key));
 
     auto create = create_newaccount(creator, chain::name(obj.account), owner_key, active_key);
-    action buyram = create_buyram(creator, chain::name(obj.account), to_asset("1.0000 EOS"));
+    action buyram = create_buyram(creator, chain::name(obj.account), to_asset("30.0000 EOS"));
 
-    auto net = to_asset("0.0010 EOS");
-    auto cpu = to_asset("0.0010 EOS");
+    auto net = to_asset("5.0000 EOS");
+    auto cpu = to_asset("5.0000 EOS");
     if ( net.get_amount() != 0 || cpu.get_amount() != 0 ) {
         action delegate = create_delegate( creator, chain::name(obj.account), net, cpu, true);
         auto test = send_actions( default_url, { create, buyram, delegate } );
@@ -106,6 +153,91 @@ void eosio::creator_plugin_impl::cretae_account_in_eosio(structures::result_crea
         auto test = send_actions( default_url, { create, buyram } );
         ilog("");
     }
+}
+
+void creator_plugin_impl::deploy_code(const std::string &account,
+                                      const std::string &wasmPath,
+                                      std::vector<chain::action> &actions) {
+    bool duplicate = false;
+    fc::sha256 old_hash, new_hash;
+    bool suppress_duplicate_check = false;
+    try {
+        const auto result = call(default_url, get_code_hash_func, fc::mutable_variant_object("account_name", account));
+        old_hash = fc::sha256(result["code_hash"].as_string());
+    } catch (...) {
+        std::cerr << "Failed to get existing code hash, continue without duplicate check..." << std::endl;
+        suppress_duplicate_check = true;
+    }
+
+    std::string wasm;
+    fc::read_file_contents(wasmPath, wasm);
+    EOS_ASSERT( !wasm.empty(), wast_file_not_found, "no wasm file found ${f}", ("f", wasmPath) );
+
+    bytes code_bytes = bytes(wasm.begin(), wasm.end());
+
+    if (!suppress_duplicate_check) {
+        if (code_bytes.size()) {
+            new_hash = fc::sha256::hash(&(code_bytes[0]), code_bytes.size());
+        }
+        duplicate = (old_hash == new_hash);
+    }
+
+    if (!duplicate)
+        actions.emplace_back( create_setcode(account, code_bytes ) );
+}
+
+void creator_plugin_impl::deploy_abi(const std::string &account,
+                                     const std::string &abiPath,
+                                     std::vector<chain::action> &actions) {
+    bytes old_abi;
+    bool duplicate = false;
+    bool suppress_duplicate_check = false;
+    try {
+        const auto result = call(default_url, get_raw_abi_func, fc::mutable_variant_object("account_name", account));
+        old_abi = result["abi"].as_blob().data;
+    } catch (...) {
+        suppress_duplicate_check = true;
+    }
+
+    EOS_ASSERT( fc::exists( abiPath ), abi_file_not_found, "no abi file found ${f}", ("f", abiPath)  );
+    bytes abi_bytes = fc::raw::pack(fc::json::from_file(abiPath).as<abi_def>());
+
+    if (!suppress_duplicate_check) {
+        duplicate = (old_abi.size() == abi_bytes.size() && std::equal(old_abi.begin(), old_abi.end(), abi_bytes.begin()));
+    }
+
+    if (!duplicate)
+        actions.emplace_back( create_setabi(account, abi_bytes) );
+}
+
+void creator_plugin_impl::update_permission(const std::string &saccount, std::vector<chain::action> &actions, public_key_type public_key) {
+    name account{saccount};
+    name parent;
+    name permission{config::active_name};
+
+    const auto &string_autority = "{\"threshold\":1, "
+                                  "\"keys\":[{\"key\":\"" +string(public_key)+ "\", \"weight\":1}], "
+                                  " \"accounts\":[{\"permission\":{\"actor\":\"" +saccount+ "\",\"permission\":\"eosio.code\"}, \"weight\":1}] "
+                                  "}";
+    ilog(string_autority);
+    authority auth = parse_json_authority_or_key(string_autority);
+
+    const auto account_result = call(default_url, get_account_func, fc::mutable_variant_object("account_name", saccount));
+    const auto& existing_permissions = account_result.get_object()["permissions"].get_array();
+    auto permissionPredicate = [this](const auto& perm) {
+        return perm.is_object() &&
+                perm.get_object().contains("perm_name") &&
+                boost::equals(perm.get_object()["perm_name"].get_string(), "active");
+    };
+
+    auto itr = boost::find_if(existing_permissions, permissionPredicate);
+    if (itr != existing_permissions.end()) {
+        parent = name((*itr).get_object()["parent"].get_string());
+    } else {
+        parent = name(config::active_name);
+    }
+
+    actions.emplace_back( create_updateauth(account, permission, parent, auth) );
 }
 
 template<typename T>
@@ -444,4 +576,49 @@ action creator_plugin_impl::create_delegate(const name &from, const name &receiv
           ("transfer", transfer);
     return create_action(vector<chain::permission_level>{{from,config::active_name}},
                          config::system_account_name, N(delegatebw), act_payload);
+}
+
+action creator_plugin_impl::create_setabi(const name &account, const bytes &abi) {
+    return action {
+       vector<chain::permission_level>{{account,config::active_name}},
+       setabi{
+          .account   = account,
+          .abi       = abi
+       }
+    };
+}
+
+action creator_plugin_impl::create_setcode(const name &account, const bytes &code) {
+    return action {
+       vector<chain::permission_level>{{account,config::active_name}},
+       setcode{
+          .account   = account,
+          .vmtype    = 0,
+          .vmversion = 0,
+          .code      = code
+       }
+    };
+}
+
+action creator_plugin_impl::create_updateauth(const name &account, const name &permission, const name &parent, const authority &auth) {
+    return action { vector<chain::permission_level>{{account,config::owner_name}},
+        updateauth{account, permission, parent, auth}};
+}
+
+authority creator_plugin_impl::parse_json_authority(const string &authorityJsonOrFile) {
+    try {
+       return json_from_file_or_string(authorityJsonOrFile).as<authority>();
+    } EOS_RETHROW_EXCEPTIONS(authority_type_exception, "Fail to parse Authority JSON '${data}'", ("data",authorityJsonOrFile))
+}
+
+authority creator_plugin_impl::parse_json_authority_or_key(const string &authorityJsonOrFile) {
+    if (boost::istarts_with(authorityJsonOrFile, "EOS") || boost::istarts_with(authorityJsonOrFile, "PUB_R1")) {
+       try {
+          return authority(public_key_type(authorityJsonOrFile));
+       } EOS_RETHROW_EXCEPTIONS(public_key_type_exception, "Invalid public key: ${public_key}", ("public_key", authorityJsonOrFile))
+    } else {
+       auto result = parse_json_authority(authorityJsonOrFile);
+       EOS_ASSERT( eosio::chain::validate(result), authority_type_exception, "Authority failed validation! ensure that keys, accounts, and waits are sorted and that the threshold is valid and satisfiable!");
+       return result;
+    }
 }
